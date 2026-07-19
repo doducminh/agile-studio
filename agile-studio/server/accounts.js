@@ -6,20 +6,21 @@ import { homedir } from "node:os";
 import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { config } from "./config.js";
 
 const pexec = promisify(execFile);
 
 // accounts.json: [{ id, label, configDir }]
 // mỗi account đã `claude auth login` sẵn trong configDir tương ứng.
-const DIR = join(homedir(), ".agile-studio");
+const DIR = config.dataDir;
 const CFG = join(DIR, "accounts.json");
 const ACCT_DIR = join(DIR, "accounts"); // config dir cho các account thêm qua UI
 
 // Config dir mặc định của Claude Code, TỰ BẮT theo HĐH:
-//  - Tôn trọng biến CLAUDE_CONFIG_DIR nếu người dùng đặt (authoritative).
+//  - Tôn trọng biến CLAUDE_CONFIG_DIR nếu người dùng đặt (qua config.js, authoritative).
 //  - Mặc định ~/.claude (đúng trên macOS/Linux/Windows vì Claude Code dùng homedir()/.claude).
 export function defaultConfigDir() {
-  return process.env.CLAUDE_CONFIG_DIR || join(homedir(), ".claude");
+  return config.claudeConfigDir;
 }
 
 export function loadAccounts() {
@@ -47,7 +48,8 @@ export function addAccount({ id, label, configDir }) {
   const list = loadAccounts().filter((a) => a.id !== id);
   // nếu đang là default duy nhất (chưa có file), giữ lại default khi thêm cái mới
   if (!existsSync(CFG)) list.push(loadDefault()[0]);
-  list.push({ id, label: label || id, configDir });
+  // label để TRỐNG nếu không có nickname (issue 13) -> UI hiển thị email thay thế.
+  list.push({ id, label: label || "", configDir });
   return saveAccounts(dedupe(list));
 }
 export function removeAccount(id) { return saveAccounts(loadAccounts().filter((a) => a.id !== id)); }
@@ -126,6 +128,24 @@ export async function fetchProfile(configDir) {
   } catch { return null; }
 }
 
+// Email của account (cache để danh sách /api/accounts không gọi mạng mỗi lần).
+// Chỉ cache khi lấy được email; null (chưa login / lỗi tạm) sẽ thử lại lần sau.
+const profileCache = new Map(); // configDir -> { email, at }
+const PROFILE_TTL = 3600_000;   // 1h
+export async function emailFor(configDir) {
+  const hit = profileCache.get(configDir);
+  if (hit && Date.now() - hit.at < PROFILE_TTL) return hit.email;
+  const p = await fetchProfile(configDir);
+  const email = p?.email || null;
+  if (email) profileCache.set(configDir, { email, at: Date.now() });
+  return email;
+}
+// Xoá cache email (gọi sau khi (đăng nhập lại) account -> tránh hiện email cũ, lệch với profile thật).
+export function clearProfileCache(configDir) {
+  if (configDir) profileCache.delete(configDir);
+  else profileCache.clear();
+}
+
 // Trả về { fiveHourPct, sevenDayPct, resetsAt } hoặc null nếu không đọc được.
 export async function fetchUsage(configDir) {
   const token = await readToken(configDir);
@@ -150,6 +170,7 @@ export async function fetchUsage(configDir) {
       sevenDayResetsAt: j?.seven_day?.resets_at ?? null,
       opusPct: j?.seven_day_opus?.utilization ?? null,
       sonnetPct: j?.seven_day_sonnet?.utilization ?? null,
+      fablePct: j?.seven_day_fable?.utilization ?? null, // issue 14 (defensive: API có thể chưa trả)
       limits: Array.isArray(j?.limits) ? j.limits.map((l) => ({
         kind: l.kind, group: l.group, percent: l.percent, severity: l.severity,
         resetsAt: l.resets_at, active: l.is_active,

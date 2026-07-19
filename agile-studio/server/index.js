@@ -1,17 +1,18 @@
+import { config } from "./config.js"; // import ĐẦU TIÊN: nạp .env, nguồn duy nhất đọc env
 import express from "express";
 import cors from "cors";
 import { createServer } from "node:http";
 import { WebSocketServer } from "ws";
 import { existsSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
-import { join, dirname, basename } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join, basename } from "node:path";
 import { store } from "./store.js";
 import { spawn, execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { randomUUID } from "node:crypto";
 const pexecFile = promisify(execFile);
-import { loadAccounts, pickAccount, fetchModels, fetchUsage, fetchProfile, addAccount, removeAccount, setAccountEnabled, enabledAccounts, newAccountConfigDir, isLoggedIn } from "./accounts.js";
+import { loadAccounts, pickAccount, fetchModels, fetchUsage, fetchProfile, addAccount, removeAccount, setAccountEnabled, enabledAccounts, newAccountConfigDir, isLoggedIn, emailFor, defaultConfigDir, clearProfileCache } from "./accounts.js";
 import { runClaude, runClaudeStream, copySessionTranscript, killChild, ROLE_ORDER, ROLE_META } from "./runner.js";
+import { claudeSpawn } from "./claudeBin.js";
 import { resolveWorkspace, buildRolePrompt, learnFromRun, listSkills, roleHasOutputs,
   saveSkill, listDocs, readDoc, writeDoc } from "./scaffold.js";
 
@@ -19,8 +20,7 @@ const app = express();
 app.use(cors());
 app.use(express.json({ limit: "30mb" })); // đủ cho upload file requirement (base64)
 
-const APP_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-const REQ_UPLOAD = join(APP_ROOT, "requirements"); // file requirement lưu theo project trong agile-studio
+const REQ_UPLOAD = config.requirementsDir; // file đính kèm requirement (env REQUIREMENTS_DIR)
 
 const http = createServer(app);
 const wss = new WebSocketServer({ server: http });
@@ -151,11 +151,14 @@ app.delete("/api/requirements/:id/files/:idx", (req, res) => {
 app.get("/api/accounts", async (req, res) => {
   const withUsage = req.query.usage === "1"; // chỉ gọi API usage khi được yêu cầu (bấm refresh)
   const list = loadAccounts();
-  const accts = await Promise.all(list.map(async (a) => ({
-    id: a.id, label: a.label, disabled: !!a.disabled,
-    loggedIn: await isLoggedIn(a.configDir), // false = chưa login / token hết hạn -> cho nút đăng nhập lại
-    usage: withUsage ? await fetchUsage(a.configDir) : null,
-  })));
+  const accts = await Promise.all(list.map(async (a) => {
+    const loggedIn = await isLoggedIn(a.configDir); // false = chưa login / token hết hạn -> nút đăng nhập lại
+    return {
+      id: a.id, label: a.label, disabled: !!a.disabled, loggedIn,
+      email: loggedIn ? await emailFor(a.configDir) : null, // hiện email thật thay vì label (issue 02)
+      usage: withUsage ? await fetchUsage(a.configDir) : null,
+    };
+  }));
   const cfg = store.getSettings();
   const enabledU = accts.filter((a) => !a.disabled);
   const active = (cfg.preferredAccount && enabledU.some((a) => a.id === cfg.preferredAccount))
@@ -173,11 +176,14 @@ const logins = new Map(); // loginId -> { child, buf, id, label, configDir, done
 app.post("/api/accounts/login/start", (req, res) => {
   // accountId -> ĐĂNG NHẬP LẠI vào account cũ (dùng configDir cũ); không có -> tạo account mới.
   const relogin = req.body.accountId ? loadAccounts().find((a) => a.id === req.body.accountId) : null;
-  const label = relogin ? relogin.label : String(req.body.label || "Account").slice(0, 40);
+  // Nickname là TUỲ CHỌN (issue 13): để trống -> lưu "" và UI hiển thị email thay cho tên gợi nhớ.
+  const label = relogin ? relogin.label : String(req.body.label || "").slice(0, 40);
   const id = relogin ? relogin.id : "acc-" + Date.now().toString(36);
   const configDir = relogin ? relogin.configDir : newAccountConfigDir(id);
-  let child;
-  try { child = spawn("claude", ["auth", "login", "--claudeai"], { env: { ...process.env, CLAUDE_CONFIG_DIR: configDir } }); }
+  let child, bin, useShell;
+  try { ({ bin, useShell } = claudeSpawn()); } // resolve Claude CLI (fix ENOENT); lỗi rõ ràng nếu thiếu
+  catch (e) { return res.status(500).json({ error: String(e.message) }); }
+  try { child = spawn(bin, ["auth", "login", "--claudeai"], { env: { ...process.env, CLAUDE_CONFIG_DIR: configDir }, shell: useShell }); }
   catch (e) { return res.status(500).json({ error: "Không chạy được claude: " + String(e.message) }); }
 
   const entry = { child, buf: "", id, label, configDir, done: false };
@@ -211,6 +217,22 @@ app.post("/api/accounts/login/code", async (req, res) => {
   });
 
   if (await isLoggedIn(entry.configDir)) {
+    clearProfileCache(entry.configDir); // vừa (đăng nhập lại) -> đọc email MỚI, tránh lệch (issue: name≠email)
+    // Guard trùng account (issue 11): nếu email vừa đăng nhập trùng 1 account KHÁC đã có -> từ chối.
+    const email = await emailFor(entry.configDir);
+    if (email) {
+      const others = loadAccounts().filter((a) => a.id !== entry.id);
+      const emails = await Promise.all(others.map((a) => emailFor(a.configDir).catch(() => null)));
+      if (emails.some((e) => e && e.toLowerCase() === email.toLowerCase())) {
+        try { entry.child.kill(); } catch {}
+        // dọn config dir TẠM của account mới (không đụng dir mặc định của account đã có)
+        if (entry.configDir && entry.configDir !== defaultConfigDir()) {
+          try { rmSync(entry.configDir, { recursive: true, force: true }); } catch {}
+        }
+        logins.delete(req.body.loginId);
+        return res.status(409).json({ error: `Account ${email} đã có trong danh sách.` });
+      }
+    }
     entry.accountAdded = true;
     addAccount({ id: entry.id, label: entry.label, configDir: entry.configDir });
     logins.delete(req.body.loginId);
@@ -1037,5 +1059,5 @@ function hintFor(kind) {
   return "";
 }
 
-const PORT = 4311;
+const PORT = config.serverPort; // env SERVER_PORT (mặc định 4311)
 http.listen(PORT, () => console.log(`Agile Studio API + WS: http://localhost:${PORT}`));
