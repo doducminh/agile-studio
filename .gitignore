@@ -1,1 +1,4 @@
 agile-studio/yarn.lock
+
+# Claude Code — cấu hình cá nhân theo máy (KHÔNG commit)
+.claude/settings.local.json
