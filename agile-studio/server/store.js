@@ -1,3 +1,4 @@
-// Shim tương thích: storage giờ tách theo driver ở server/store/. Giữ import cũ
-// `import { store } from "./store.js"` chạy nguyên (issue 04). Đổi engine qua STORAGE_DRIVER.
+// Compatibility shim: storage now lives under server/store/ split by backend.
+// Existing `import { store } from "./store.js"` keeps working; the engine is
+// selected at runtime by STORAGE_DRIVER.
 export { store } from "./store/index.js";

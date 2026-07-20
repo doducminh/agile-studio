@@ -1,10 +1,10 @@
 // Discord bot điều khiển Agile Studio từ xa + nhận thông báo.
 // Chạy CÙNG MÁY với server (gọi localhost:4311). Bot kết nối RA Discord nên không cần mở cổng.
 //
-// Cấu hình (issue 08): `.env` là nguồn chính — DISCORD_TOKEN / DISCORD_CHANNEL / DISCORD_MENTION /
-//   DISCORD_PREFIX / AGILE_API. Vẫn giữ fallback file bot.config.json (gitignored) / ~/.agile-studio/bot.json.
-// Cần bật intent "MESSAGE CONTENT" cho bot ở Discord Developer Portal.
-import "dotenv/config"; // nạp .env (bot là process riêng npm run bot, không đi qua server/config.js)
+// Config: `.env` is the primary source — DISCORD_TOKEN / DISCORD_CHANNEL / DISCORD_MENTION /
+//   DISCORD_PREFIX / AGILE_API. A bot.config.json (gitignored) / ~/.agile-studio/bot.json still
+//   works as an optional local fallback. Enable the "MESSAGE CONTENT" intent in the Discord portal.
+import "dotenv/config"; // load .env (the bot is its own `npm run bot` process, not routed through server/config.js)
 import { WebSocket } from "ws";
 import { Client, GatewayIntentBits, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, ModalBuilder, TextInputBuilder, TextInputStyle } from "discord.js";
 import { readFileSync, existsSync } from "node:fs";

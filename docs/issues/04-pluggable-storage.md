@@ -2,27 +2,31 @@
 
 - **Type:** Feature
 - **Priority:** P2
-- **Effort:** L (spec) · S đã ship (json + sqlite)
+- **Effort:** L (spec) · đã ship json + sqlite + postgres (PR #11)
 - **Labels:** `enhancement`, `storage`, `architecture`
 - **Depends on:** 03 (`.env` config)
 
-## ✅ Đã ship (scope chốt — PR #11)
+## ✅ Đã ship (PR #11)
 
-`STORAGE_DRIVER` chọn engine, giữ **đúng method surface cũ** nên call-site không đổi
-(`store.js` thành shim re-export):
+`STORAGE_DRIVER` chọn engine, giữ **đúng method surface cũ** và **SYNC** nên call-site
+(`server/index.js`) KHÔNG đổi (`store.js` thành shim re-export). Model domain nằm trong
+bộ nhớ (`server/store/state.js`); mỗi backend load snapshot 1 lần lúc khởi động rồi ghi
+lại dưới dạng **1 document**, có debounce write-behind + flush khi SIGINT/SIGTERM:
 
-- `server/store/json.js` — engine JSON 1-file hiện tại (**mặc định**, zero-config).
-- `server/store/sqlite.js` — **`node:sqlite` built-in** (sync, WAL). KHÔNG dùng
-  `better-sqlite3` (native compile) — built-in đủ, zero-dep. Tự migrate `studio.json`
-  vào DB lần đầu; giữ seq id chung; enforce cap cũ (logs 500 / sessions 60 / session
-  logs 1000).
-- `server/store/index.js` — chọn driver theo `STORAGE_DRIVER` (`json` | `sqlite`).
+- `server/store/json.js` — 1 file `studio.json` (**mặc định**, zero-config).
+- `server/store/sqlite.js` — 1 file `.sqlite` qua **`node:sqlite` built-in** (không native
+  compile, không dep thêm).
+- `server/store/postgres.js` — **1 DB chung** (`DATABASE_URL`): load lúc boot + ghi lại,
+  dùng để chạy app **trên nhiều máy** chung 1 database. `pg` là optionalDependency, import
+  lazy chỉ cho driver này.
 
-**Quyết định:** API giữ **SYNC** (json + sqlite đều sync) → 0 call-site phải `await`.
-**Postgres CHƯA làm** (chọn `postgres` → throw lỗi rõ): `pg` async ép refactor `await`
-toàn bộ store cho app single-tenant local không có ghi đồng thời đa tiến trình = YAGNI.
-Thêm khi thật sự deploy shared/hosted. Verify: parity json≡sqlite + migration + app boot
-dưới sqlite. Phần dưới là spec gốc (giữ tham chiếu, gồm cả Postgres để sau).
+Đổi sang sqlite/postgres tự import `studio.json` sẵn có lần đầu.
+
+**Ceiling (ponytail):** persistence theo kiểu whole-document last-writer-wins + debounce —
+đúng cho dùng cá nhân 1 máy tại 1 thời điểm; nếu 2 máy sửa đồng thời cần per-entity write +
+row locking. Verify: parity json≡sqlite + persistence round-trip + migration; postgres
+migrate/write/reload qua connection khác + boot server thật (create project, settings,
+SIGINT flush) trên Postgres thật (docker). Phần dưới là spec gốc (giữ tham chiếu).
 
 ## Problem
 

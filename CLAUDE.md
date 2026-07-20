@@ -36,8 +36,9 @@ PM → BA → DA → Dev → QC → PO. Server Express + WS, web React (Vite), 1
 - **08** (Discord bot qua `.env`) → **PR #8** (không có GitHub issue tương ứng; off #4).
   Đã xoá `bot.config.mock.json` (token giả, không rotate).
 - **killChild Windows** (`taskkill /T /F`) → **PR #10** (off #4).
-- **04** (pluggable storage json|sqlite) → **PR #11** (off #4). node:sqlite built-in;
-  Postgres CHƯA làm (YAGNI, throw lỗi rõ).
+- **04** (pluggable storage json|sqlite|**postgres**) → **PR #11** (off #4). In-memory model
+  (`store/state.js`) + backend ghi 1 document; API giữ SYNC (0 call-site đổi). node:sqlite
+  built-in; postgres cho **nhiều máy chung 1 DB** (`DATABASE_URL`, `pg` optional, lazy import).
 
 ## Đã xong
 - **01** `spawn claude ENOENT`: `server/claudeBin.js` resolve Claude CLI (env `CLAUDE_BIN`
@@ -56,11 +57,18 @@ PM → BA → DA → Dev → QC → PO. Server Express + WS, web React (Vite), 1
 2. **Issue #6 text** vẫn mô tả bản UI phức tạp cũ → chỉ sửa được nếu có quyền write upstream
    (hiện READ-only). `docs/issues/04,05` đã sửa về scope đã ship. Issue #10 (responsive) đã
    revert → nếu làm lại dùng layout **stacked** (không off-canvas drawer).
-3. **Postgres cho 04** (nếu deploy shared/hosted): thêm `store/postgres.js` — buộc chuyển
-   store API sang async + `await` mọi call-site. Hiện throw lỗi rõ khi `STORAGE_DRIVER=postgres`.
+3. **Storage postgres — ceiling:** persistence whole-document last-writer-wins + debounce.
+   Nếu cần **2 máy sửa ĐỒNG THỜI** (không chỉ luân phiên) thì nâng lên per-entity write +
+   row locking. Hiện đủ cho dùng cá nhân luân phiên nhiều máy chung 1 DB.
 4. **Ghi chú kỹ thuật:** ~~`claude auth login --claudeai`~~ đã kiểm — VẪN hợp lệ trên CLI
    2.1.215 (`--claudeai` là mặc định; có thêm `--email` prefill). Schema plugin
    (`enabledPlugins`) vẫn tuỳ phiên bản.
+
+## Quy ước (yêu cầu của chủ repo)
+- **Comment trong code phần mình viết: TIẾNG ANH** (không chú thích tiếng Việt). Chuỗi
+  runtime hướng người dùng vẫn tiếng Việt theo app.
+- **`docs/issues/` là thư mục RIÊNG của chủ repo:** KHÔNG push lên PR, KHÔNG trỏ tới nó
+  trong PR/commit message gửi upstream.
 
 ## Cấu hình cá nhân (chỉ của mình — KHÔNG commit)
 `.claude/settings.local.json` bị gitignore nên KHÔNG theo nhánh sang máy khác.
