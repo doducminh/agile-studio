@@ -72,9 +72,9 @@ PM → BA → DA → Dev → QC → PO. Server Express + WS, web React (Vite), 1
 ## Việc cần làm tiếp (TODO)
 1. **Theo dõi PR** — chờ maintainer review/merge. Thứ tự: **#4** → #7/#8/#10/#11 (stacked #4)
    → **#12** (sau #11) → **#13** (sau #12); #9 độc lập off `main`.
-2. **Issue #6 text** vẫn mô tả bản UI phức tạp cũ → chỉ sửa được nếu có quyền write upstream
-   (hiện READ-only). `docs/issues/04,05` đã sửa về scope đã ship. Issue #10 (responsive) đã
-   revert → nếu làm lại dùng layout **stacked** (không off-canvas drawer).
+2. **Issue #6 text** ĐÃ sửa về scope đã ship (PR #9) — sửa được vì `doducminh` là **tác giả
+   issue** (tác giả sửa body của mình dù chỉ READ repo). Cùng cơ chế cho issue #1,2,3,5 nếu
+   cần. Issue #10 (responsive) đã revert → nếu làm lại dùng layout **stacked** (không drawer).
 3. **Storage postgres — ceiling còn lại:** merge whole-document, poll 4s. Nếu cần realtime/
    throughput cao thì đổi sang change-feed per-row (LISTEN/NOTIFY) thay vì poll. Hiện đủ
    cho vài máy cá nhân.
