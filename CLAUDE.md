@@ -32,22 +32,30 @@ PM → BA → DA → Dev → QC → PO. Server Express + WS, web React (Vite), 1
 | `feat/session-usage-metrics` | token + %5h mỗi công việc (stacked trên #12) → **PR #13**. |
 | `wip/local-01-15` | Snapshot an toàn (backup). |
 
-## GitHub issues & PRs (trên `TranDuy13/agile-studio`)
-- **#1/#2/#3** (bug: ENOENT, email, .env) → **PR #4** (`Fixes #1 #2 #3`).
-- **#5** (UX gộp: 09,11–15) → **PR #7** (`Fixes #5`, stacked trên #4 — merge #4 trước).
-- **#6** (05 skill/plugin/role settings) → **PR #9** (`Fixes #6`, off `main`). Đã làm gọn
-  thành file `.claude/settings.json` vật lý (không còn code sinh tự động).
-- **08** (Discord bot qua `.env`) → **PR #8** (không có GitHub issue tương ứng; off #4).
-  Đã xoá `bot.config.mock.json` (token giả, không rotate).
-- **killChild Windows** (`taskkill /T /F`) → **PR #10** (off #4).
-- **04** (pluggable storage json|sqlite|**postgres**) → **PR #11** (off #4). In-memory model
+## GitHub issues ↔ PRs (trên `TranDuy13/agile-studio`)
+Mọi issue do `doducminh` tạo → tự sửa body được (tác giả). Mọi PR đã gắn `Fixes #N` (auto-close khi merge).
+| Issue | PR | Nội dung |
+|-------|-----|----------|
+| **#1 #2 #3** | **#4** | ENOENT · email account · path `.env` |
+| **#5** | **#7** | UX account/login (09,11–15) |
+| **#6** | **#9** | `.claude/settings.json` vật lý (thu gọn từ bản UI cũ) |
+| **#14** | **#11** | pluggable storage json/sqlite/postgres + file vào DB + concurrent |
+| **#15** | **#8** | Discord bot qua `.env` + xoá mock token |
+| **#16** | **#10** | killChild Windows (`taskkill /T /F`) |
+| **#17** | **#12** | xoá project + bulk-add folder/git-repo |
+| **#18** | **#13** | đo token + %5h mỗi công việc |
+
+Body issue #1,2,3,5,6 đã thêm banner "✅ Shipped in PR #N". Issue #14–18 mới tạo (mô tả + shipped).
+
+## Chi tiết PR
+- **04** (pluggable storage json|sqlite|**postgres**) → **PR #11** / issue **#14** (off #4). In-memory model
   (`store/state.js`) + backend ghi 1 document; API giữ SYNC (0 call-site đổi). node:sqlite
   built-in; postgres cho **nhiều máy chung 1 DB** (`DATABASE_URL`, `pg` optional, lazy import).
   **File cũng vào DB:** `server/workspace.js` mirror docs workspace (`projects/<slug>`) +
   upload requirement vào store khi dùng DB driver; đĩa chỉ là bản làm việc cho agent
   (materialize trước khi chạy / trước khi UI đọc, sync ngược trong `persist()`).
   Workspace **mode "repo"** (`document/` trong repo code) KHÔNG bị mirror/ghi đè.
-- **Quản lý project** → **PR #12** (stacked #11). Xoá project (cascade, không đụng file đĩa);
+- **Quản lý project** → **PR #12** / issue **#17** (stacked #11). Xoá project (cascade, không đụng file đĩa);
   `GET /api/drives`, `GET /api/scan?path&mode=folders|repos&depth`, `POST /api/projects/bulk`;
   UI: tab "Quét hàng loạt" trong AddProjectModal + nút 🗑 mỗi project.
 - **Postgres concurrent-safe** (đã gộp vào **PR #11**): flush = locked read-modify-write
