@@ -24,13 +24,17 @@ PM → BA → DA → Dev → QC → PO. Server Express + WS, web React (Vite), 1
 | `personal/local-work` | **Nhánh làm việc chính** — TẤT CẢ code (01–15) + `docs/issues/` + `.claude/settings.json`. Làm việc tiếp ở đây. |
 | `fix/login-email-env-paths` | 01–03 → **PR #4**. Đã push lên `fork`. |
 | `fix/account-login-ux` | 09,11–15 (stacked trên #4) → **PR #7**. Đã push lên `fork`. |
+| `feat/discord-bot-env-08` | 08 bot qua `.env` + xoá mock (stacked trên #4) → **PR #8**. |
+| `feat/project-claude-settings-05` | 05 `.claude/settings.json` vật lý (off `main`) → **PR #9**. |
 | `wip/local-01-15` | Snapshot an toàn (backup). |
 
 ## GitHub issues & PRs (trên `TranDuy13/agile-studio`)
 - **#1/#2/#3** (bug: ENOENT, email, .env) → **PR #4** (`Fixes #1 #2 #3`).
 - **#5** (UX gộp: 09,11–15) → **PR #7** (`Fixes #5`, stacked trên #4 — merge #4 trước).
-- **#6** (05 skill/plugin/role settings) → CHƯA có PR. Đã làm gọn thành file
-  `.claude/settings.json` vật lý (không còn code sinh tự động).
+- **#6** (05 skill/plugin/role settings) → **PR #9** (`Fixes #6`, off `main`). Đã làm gọn
+  thành file `.claude/settings.json` vật lý (không còn code sinh tự động).
+- **08** (Discord bot qua `.env`) → **PR #8** (không có GitHub issue tương ứng; off #4).
+  Đã xoá `bot.config.mock.json` (token giả, không rotate).
 
 ## Đã xong
 - **01** `spawn claude ENOENT`: `server/claudeBin.js` resolve Claude CLI (env `CLAUDE_BIN`
@@ -44,18 +48,17 @@ PM → BA → DA → Dev → QC → PO. Server Express + WS, web React (Vite), 1
 - **05** file `.claude/settings.json` mặc định (permissions Read/Web, defaultMode acceptEdits).
 
 ## Việc cần làm tiếp (TODO)
-1. **Theo dõi PR #4, #7** — chờ maintainer review/merge (merge #4 trước #7).
-2. **PR cho #6 (05)** nếu muốn: tách commit `.claude/settings.json` ra nhánh sạch (off
-   nhánh UX hoặc main), mở PR `Fixes #6`.
-3. **Cập nhật doc/issue cho đúng scope đã chốt:** issue #6 + `docs/issues/05-*.md` vẫn mô tả
-   bản UI phức tạp cũ → sửa về "ship file `.claude/settings.json` vật lý". Issue #10 đã revert
-   (responsive) → nếu làm lại thì dùng layout **stacked** (không dùng off-canvas drawer).
+1. **Theo dõi PR #4, #7, #8, #9** — chờ maintainer review/merge. Thứ tự: **#4 trước**,
+   rồi #7/#8 (đều stacked trên #4); #9 độc lập off `main`.
+2. **Issue #6 text** vẫn mô tả bản UI phức tạp cũ → chỉ sửa được nếu có quyền write upstream
+   (hiện READ-only). `docs/issues/05-*.md` đã sửa về scope "file vật lý". Issue #10 đã revert
+   (responsive) → nếu làm lại thì dùng layout **stacked** (không off-canvas drawer).
+3. **killChild trên Windows** (đang làm): `runner.js` dùng `process.kill(-pid)` (POSIX group)
+   — Windows không chạy + `useShell=true` thì `detached=false` = không group. Cần `taskkill
+   /T /F /PID`. Verify: chạy app thật, tạo session, pause, xác nhận cây tiến trình chết.
 4. **Feature còn lại (mới có doc, chưa code):**
    - **04** pluggable storage (JSON/SQLite/Postgres) — `docs/issues/04-*.md`.
-   - **08** 1 Discord bot cấu hình qua `.env` — `docs/issues/08-*.md` (kèm xoá
-     `bot.config.mock.json` đang lộ token, rotate token).
 5. **Ghi chú kỹ thuật cần kiểm chứng:** lệnh `claude auth login --claudeai` có thể lỗi thời;
-   `killChild` (runner) chưa kill được cây tiến trình trên Windows (cần `taskkill /T /F`);
    schema plugin của Claude Code (`enabledPlugins`) tuỳ phiên bản.
 
 ## Cấu hình cá nhân (chỉ của mình — KHÔNG commit)

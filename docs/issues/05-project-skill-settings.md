@@ -2,11 +2,32 @@
 
 - **Type:** Feature
 - **Priority:** P2
-- **Effort:** M
+- **Effort:** S (bản đã ship) · M (bản đầy đủ, để sau)
 - **Labels:** `enhancement`, `skills`, `plugins`, `config`
 - **Depends on:** 03 (`.env` config)
 
-## Problem
+## ✅ Đã ship (scope chốt — PR #9, issue #6)
+
+Chốt lại: **chỉ ship 1 file `.claude/settings.json` vật lý, commit vào repo** — KHÔNG
+làm loader/merger nhiều tầng, KHÔNG UI panel, KHÔNG plugin applier. File mặc định:
+
+```json
+{
+  "permissions": { "allow": ["Read(*)", "WebFetch(*)", "WebSearch(*)"] },
+  "enabledPlugins": {},
+  "defaultMode": "acceptEdits"
+}
+```
+
+- Permissions mặc định chỉ đọc (an toàn cho contributor mới clone).
+- Không bật plugin nào mặc định; `defaultMode: acceptEdits`.
+- Override cá nhân đặt ở `.claude/settings.local.json` (đã gitignore), không theo repo.
+
+Phần "Proposed fix" bên dưới là **bản thiết kế đầy đủ CHƯA làm** — giữ lại làm tham chiếu
+nếu sau này cần settings động (role toggle, model, plugin per-project). Đừng nhầm là scope
+hiện tại.
+
+## Problem (bản đầy đủ — để sau)
 
 The user wants project-wide configuration, analogous to Claude Code's
 `.claude/settings.json` — a single declarative place to configure, for the whole
@@ -41,7 +62,7 @@ Configuration is spread across disconnected places, and plugins aren't managed a
 
 There is **no single declarative settings file** for roles or plugins.
 
-## Proposed fix
+## Proposed fix (CHƯA làm — bản đầy đủ để sau)
 
 A layered settings model with an on-disk file resembling `.claude/settings.json`,
 covering roles **and** plugins.
