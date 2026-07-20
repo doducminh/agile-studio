@@ -29,6 +29,7 @@ PM → BA → DA → Dev → QC → PO. Server Express + WS, web React (Vite), 1
 | `fix/killchild-windows-taskkill` | killChild `taskkill /T /F` (stacked trên #4) → **PR #10**. |
 | `feat/pluggable-storage-04` | 04 storage json/sqlite/postgres + workspace vào DB (stacked #4) → **PR #11**. |
 | `feat/project-management` | xoá project + bulk-add folder/git-repo (stacked trên #11) → **PR #12**. |
+| `feat/session-usage-metrics` | token + %5h mỗi công việc (stacked trên #12) → **PR #13**. |
 | `wip/local-01-15` | Snapshot an toàn (backup). |
 
 ## GitHub issues & PRs (trên `TranDuy13/agile-studio`)
@@ -49,6 +50,13 @@ PM → BA → DA → Dev → QC → PO. Server Express + WS, web React (Vite), 1
 - **Quản lý project** → **PR #12** (stacked #11). Xoá project (cascade, không đụng file đĩa);
   `GET /api/drives`, `GET /api/scan?path&mode=folders|repos&depth`, `POST /api/projects/bulk`;
   UI: tab "Quét hàng loạt" trong AddProjectModal + nút 🗑 mỗi project.
+- **Postgres concurrent-safe** (đã gộp vào **PR #11**): flush = locked read-modify-write
+  (`SELECT … FOR UPDATE`) + merge delta → 2 máy sửa entity KHÁC nhau không clobber;
+  cùng entity = last-writer-wins; poll 4s để hội tụ. `mergeDoc()` trong `store/postgres.js`.
+- **Usage/công việc** → **PR #13** (stacked #12). Mỗi session cộng dồn **token** (từ
+  `result.usage`) + **≈ % limit 5h** (delta 5h% đầu/cuối job). Hiện trên SessionCard.
+- **Đã verify vòng agent thật**: session project 9 (Dev) chạy → ghi `DEV_F04_*.md` ra đĩa →
+  `syncDocsBack` nạp vào Postgres `docFiles` (nội dung markdown thật). Materialize→ghi→sync OK.
 
 ## Đã xong
 - **01** `spawn claude ENOENT`: `server/claudeBin.js` resolve Claude CLI (env `CLAUDE_BIN`
@@ -62,16 +70,14 @@ PM → BA → DA → Dev → QC → PO. Server Express + WS, web React (Vite), 1
 - **05** file `.claude/settings.json` mặc định (permissions Read/Web, defaultMode acceptEdits).
 
 ## Việc cần làm tiếp (TODO)
-1. **Theo dõi PR** — chờ maintainer review/merge. Thứ tự: **#4 trước**, rồi #7/#8/#10/#11
-   (stacked trên #4), **#12 sau #11**; #9 độc lập off `main`.
-0. **Chưa test vòng agent thật** cho storage workspace (materialize → agent ghi → sync back)
-   vì cần Claude account + quota. Chạy 1 session thật là verify nốt.
+1. **Theo dõi PR** — chờ maintainer review/merge. Thứ tự: **#4** → #7/#8/#10/#11 (stacked #4)
+   → **#12** (sau #11) → **#13** (sau #12); #9 độc lập off `main`.
 2. **Issue #6 text** vẫn mô tả bản UI phức tạp cũ → chỉ sửa được nếu có quyền write upstream
    (hiện READ-only). `docs/issues/04,05` đã sửa về scope đã ship. Issue #10 (responsive) đã
    revert → nếu làm lại dùng layout **stacked** (không off-canvas drawer).
-3. **Storage postgres — ceiling:** persistence whole-document last-writer-wins + debounce.
-   Nếu cần **2 máy sửa ĐỒNG THỜI** (không chỉ luân phiên) thì nâng lên per-entity write +
-   row locking. Hiện đủ cho dùng cá nhân luân phiên nhiều máy chung 1 DB.
+3. **Storage postgres — ceiling còn lại:** merge whole-document, poll 4s. Nếu cần realtime/
+   throughput cao thì đổi sang change-feed per-row (LISTEN/NOTIFY) thay vì poll. Hiện đủ
+   cho vài máy cá nhân.
 4. **Ghi chú kỹ thuật:** ~~`claude auth login --claudeai`~~ đã kiểm — VẪN hợp lệ trên CLI
    2.1.215 (`--claudeai` là mặc định; có thêm `--email` prefill). Schema plugin
    (`enabledPlugins`) vẫn tuỳ phiên bản.
