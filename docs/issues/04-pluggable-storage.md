@@ -2,9 +2,27 @@
 
 - **Type:** Feature
 - **Priority:** P2
-- **Effort:** L
+- **Effort:** L (spec) · S đã ship (json + sqlite)
 - **Labels:** `enhancement`, `storage`, `architecture`
 - **Depends on:** 03 (`.env` config)
+
+## ✅ Đã ship (scope chốt — PR #11)
+
+`STORAGE_DRIVER` chọn engine, giữ **đúng method surface cũ** nên call-site không đổi
+(`store.js` thành shim re-export):
+
+- `server/store/json.js` — engine JSON 1-file hiện tại (**mặc định**, zero-config).
+- `server/store/sqlite.js` — **`node:sqlite` built-in** (sync, WAL). KHÔNG dùng
+  `better-sqlite3` (native compile) — built-in đủ, zero-dep. Tự migrate `studio.json`
+  vào DB lần đầu; giữ seq id chung; enforce cap cũ (logs 500 / sessions 60 / session
+  logs 1000).
+- `server/store/index.js` — chọn driver theo `STORAGE_DRIVER` (`json` | `sqlite`).
+
+**Quyết định:** API giữ **SYNC** (json + sqlite đều sync) → 0 call-site phải `await`.
+**Postgres CHƯA làm** (chọn `postgres` → throw lỗi rõ): `pg` async ép refactor `await`
+toàn bộ store cho app single-tenant local không có ghi đồng thời đa tiến trình = YAGNI.
+Thêm khi thật sự deploy shared/hosted. Verify: parity json≡sqlite + migration + app boot
+dưới sqlite. Phần dưới là spec gốc (giữ tham chiếu, gồm cả Postgres để sau).
 
 ## Problem
 

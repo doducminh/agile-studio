@@ -35,6 +35,9 @@ PM → BA → DA → Dev → QC → PO. Server Express + WS, web React (Vite), 1
   thành file `.claude/settings.json` vật lý (không còn code sinh tự động).
 - **08** (Discord bot qua `.env`) → **PR #8** (không có GitHub issue tương ứng; off #4).
   Đã xoá `bot.config.mock.json` (token giả, không rotate).
+- **killChild Windows** (`taskkill /T /F`) → **PR #10** (off #4).
+- **04** (pluggable storage json|sqlite) → **PR #11** (off #4). node:sqlite built-in;
+  Postgres CHƯA làm (YAGNI, throw lỗi rõ).
 
 ## Đã xong
 - **01** `spawn claude ENOENT`: `server/claudeBin.js` resolve Claude CLI (env `CLAUDE_BIN`
@@ -48,18 +51,16 @@ PM → BA → DA → Dev → QC → PO. Server Express + WS, web React (Vite), 1
 - **05** file `.claude/settings.json` mặc định (permissions Read/Web, defaultMode acceptEdits).
 
 ## Việc cần làm tiếp (TODO)
-1. **Theo dõi PR #4, #7, #8, #9** — chờ maintainer review/merge. Thứ tự: **#4 trước**,
-   rồi #7/#8 (đều stacked trên #4); #9 độc lập off `main`.
+1. **Theo dõi PR** — chờ maintainer review/merge. Thứ tự: **#4 trước**, rồi #7/#8/#10/#11
+   (đều stacked trên #4); #9 độc lập off `main`.
 2. **Issue #6 text** vẫn mô tả bản UI phức tạp cũ → chỉ sửa được nếu có quyền write upstream
-   (hiện READ-only). `docs/issues/05-*.md` đã sửa về scope "file vật lý". Issue #10 đã revert
-   (responsive) → nếu làm lại thì dùng layout **stacked** (không off-canvas drawer).
-3. **killChild trên Windows** (đang làm): `runner.js` dùng `process.kill(-pid)` (POSIX group)
-   — Windows không chạy + `useShell=true` thì `detached=false` = không group. Cần `taskkill
-   /T /F /PID`. Verify: chạy app thật, tạo session, pause, xác nhận cây tiến trình chết.
-4. **Feature còn lại (mới có doc, chưa code):**
-   - **04** pluggable storage (JSON/SQLite/Postgres) — `docs/issues/04-*.md`.
-5. **Ghi chú kỹ thuật cần kiểm chứng:** lệnh `claude auth login --claudeai` có thể lỗi thời;
-   schema plugin của Claude Code (`enabledPlugins`) tuỳ phiên bản.
+   (hiện READ-only). `docs/issues/04,05` đã sửa về scope đã ship. Issue #10 (responsive) đã
+   revert → nếu làm lại dùng layout **stacked** (không off-canvas drawer).
+3. **Postgres cho 04** (nếu deploy shared/hosted): thêm `store/postgres.js` — buộc chuyển
+   store API sang async + `await` mọi call-site. Hiện throw lỗi rõ khi `STORAGE_DRIVER=postgres`.
+4. **Ghi chú kỹ thuật:** ~~`claude auth login --claudeai`~~ đã kiểm — VẪN hợp lệ trên CLI
+   2.1.215 (`--claudeai` là mặc định; có thêm `--email` prefill). Schema plugin
+   (`enabledPlugins`) vẫn tuỳ phiên bản.
 
 ## Cấu hình cá nhân (chỉ của mình — KHÔNG commit)
 `.claude/settings.local.json` bị gitignore nên KHÔNG theo nhánh sang máy khác.
