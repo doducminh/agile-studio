@@ -8,10 +8,18 @@ import { claudeSpawn } from "./claudeBin.js";
 // Bỏ mã màu ANSI (\x1b[..m) khỏi output để log hiển thị sạch, không tràn/đè.
 const stripAnsi = (s) => String(s).replace(/\x1b\[[0-9;]*m/g, "");
 
-// Kill claude + TOÀN BỘ tiến trình con (build/tsc/...) bằng cách kill cả process group,
-// và SIGKILL ép chết nếu SIGTERM không ăn (tránh treo ở "Đang dừng…").
+// Kill claude + TOÀN BỘ tiến trình con (build/tsc/...) để không treo ở "Đang dừng…".
 export function killChild(child) {
   if (!child || child.killed) return;
+  if (process.platform === "win32") {
+    // Windows KHÔNG có process group kiểu POSIX; hơn nữa khi spawn qua shell (.cmd) thì
+    // child là cmd.exe, claude + build/tsc là cháu → child.kill() chỉ giết cmd, để lại cây con.
+    // taskkill /T giết cả cây theo PID, /F ép chết.
+    try { spawn("taskkill", ["/pid", String(child.pid), "/T", "/F"]); }
+    catch { try { child.kill(); } catch {} }
+    return;
+  }
+  // POSIX: kill cả process group (detached => pid âm = group), SIGKILL ép nếu SIGTERM không ăn.
   const grp = () => { try { process.kill(-child.pid, "SIGTERM"); return true; } catch { return false; } };
   if (!grp()) { try { child.kill("SIGTERM"); } catch {} }
   setTimeout(() => {
