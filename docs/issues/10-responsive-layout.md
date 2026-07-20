@@ -2,8 +2,16 @@
 
 - **Type:** Enhancement
 - **Priority:** P2
-- **Effort:** M
+- **Effort:** S (shipped)
 - **Labels:** `enhancement`, `ux`, `css`, `responsive`
+
+## ✅ Đã ship (GitHub issue #19 · PR #20)
+
+Bản **stacked, CSS-only** (không hamburger/JS/drawer). Media query `@media (max-width: 820px)`
+trong `web/src/styles.css`: `.app` đổi sang 1 cột + rows `auto 1fr` (sidebar trên, cap 44vh,
+scroll riêng; main dưới — **cả hai luôn hiện**); `.acct-row` wrap; `.topbar` wrap; `.docs`
+stack list trên editor. Desktop (>820px) giữ nguyên. Lần trước thử off-canvas drawer → regress
+→ đã revert; bản này dùng stacked. Phần dưới là spec gốc (giữ tham chiếu).
 
 ## Problem
 

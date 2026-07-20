@@ -30,6 +30,7 @@ PM → BA → DA → Dev → QC → PO. Server Express + WS, web React (Vite), 1
 | `feat/pluggable-storage-04` | 04 storage json/sqlite/postgres + workspace vào DB (stacked #4) → **PR #11**. |
 | `feat/project-management` | xoá project + bulk-add folder/git-repo (stacked trên #11) → **PR #12**. |
 | `feat/session-usage-metrics` | token + %5h mỗi công việc (stacked trên #12) → **PR #13**. |
+| `feat/responsive-stacked-10` | responsive stacked CSS (off `main`) → **PR #20** / issue #19. |
 | `wip/local-01-15` | Snapshot an toàn (backup). |
 
 ## GitHub issues ↔ PRs (trên `TranDuy13/agile-studio`)
@@ -44,6 +45,7 @@ Mọi issue do `doducminh` tạo → tự sửa body được (tác giả). Mọ
 | **#16** | **#10** | killChild Windows (`taskkill /T /F`) |
 | **#17** | **#12** | xoá project + bulk-add folder/git-repo |
 | **#18** | **#13** | đo token + %5h mỗi công việc |
+| **#19** | **#20** | responsive stacked layout (CSS-only, ≤820px) |
 
 Body issue #1,2,3,5,6 đã thêm banner "✅ Shipped in PR #N". Issue #14–18 mới tạo (mô tả + shipped).
 
@@ -80,9 +82,8 @@ Body issue #1,2,3,5,6 đã thêm banner "✅ Shipped in PR #N". Issue #14–18 m
 ## Việc cần làm tiếp (TODO)
 1. **Theo dõi PR** — chờ maintainer review/merge. Thứ tự: **#4** → #7/#8/#10/#11 (stacked #4)
    → **#12** (sau #11) → **#13** (sau #12); #9 độc lập off `main`.
-2. **Issue #6 text** ĐÃ sửa về scope đã ship (PR #9) — sửa được vì `doducminh` là **tác giả
-   issue** (tác giả sửa body của mình dù chỉ READ repo). Cùng cơ chế cho issue #1,2,3,5 nếu
-   cần. Issue #10 (responsive) đã revert → nếu làm lại dùng layout **stacked** (không drawer).
+2. **Body issue tự sửa được** vì `doducminh` là tác giả (dù chỉ READ repo). Đã đồng bộ banner
+   "Shipped" cho #1,2,3,5,6. Responsive (spec 10) đã làm xong → issue #19 / PR #20.
 3. **Storage postgres — ceiling còn lại:** merge whole-document, poll 4s. Nếu cần realtime/
    throughput cao thì đổi sang change-feed per-row (LISTEN/NOTIFY) thay vì poll. Hiện đủ
    cho vài máy cá nhân.
