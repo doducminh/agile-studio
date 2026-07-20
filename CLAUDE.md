@@ -39,6 +39,10 @@ PM → BA → DA → Dev → QC → PO. Server Express + WS, web React (Vite), 1
 - **04** (pluggable storage json|sqlite|**postgres**) → **PR #11** (off #4). In-memory model
   (`store/state.js`) + backend ghi 1 document; API giữ SYNC (0 call-site đổi). node:sqlite
   built-in; postgres cho **nhiều máy chung 1 DB** (`DATABASE_URL`, `pg` optional, lazy import).
+  **File cũng vào DB:** `server/workspace.js` mirror docs workspace (`projects/<slug>`) +
+  upload requirement vào store khi dùng DB driver; đĩa chỉ là bản làm việc cho agent
+  (materialize trước khi chạy / trước khi UI đọc, sync ngược trong `persist()`).
+  Workspace **mode "repo"** (`document/` trong repo code) KHÔNG bị mirror/ghi đè.
 
 ## Đã xong
 - **01** `spawn claude ENOENT`: `server/claudeBin.js` resolve Claude CLI (env `CLAUDE_BIN`
