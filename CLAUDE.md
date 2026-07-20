@@ -26,6 +26,9 @@ PM → BA → DA → Dev → QC → PO. Server Express + WS, web React (Vite), 1
 | `fix/account-login-ux` | 09,11–15 (stacked trên #4) → **PR #7**. Đã push lên `fork`. |
 | `feat/discord-bot-env-08` | 08 bot qua `.env` + xoá mock (stacked trên #4) → **PR #8**. |
 | `feat/project-claude-settings-05` | 05 `.claude/settings.json` vật lý (off `main`) → **PR #9**. |
+| `fix/killchild-windows-taskkill` | killChild `taskkill /T /F` (stacked trên #4) → **PR #10**. |
+| `feat/pluggable-storage-04` | 04 storage json/sqlite/postgres + workspace vào DB (stacked #4) → **PR #11**. |
+| `feat/project-management` | xoá project + bulk-add folder/git-repo (stacked trên #11) → **PR #12**. |
 | `wip/local-01-15` | Snapshot an toàn (backup). |
 
 ## GitHub issues & PRs (trên `TranDuy13/agile-studio`)
@@ -43,6 +46,9 @@ PM → BA → DA → Dev → QC → PO. Server Express + WS, web React (Vite), 1
   upload requirement vào store khi dùng DB driver; đĩa chỉ là bản làm việc cho agent
   (materialize trước khi chạy / trước khi UI đọc, sync ngược trong `persist()`).
   Workspace **mode "repo"** (`document/` trong repo code) KHÔNG bị mirror/ghi đè.
+- **Quản lý project** → **PR #12** (stacked #11). Xoá project (cascade, không đụng file đĩa);
+  `GET /api/drives`, `GET /api/scan?path&mode=folders|repos&depth`, `POST /api/projects/bulk`;
+  UI: tab "Quét hàng loạt" trong AddProjectModal + nút 🗑 mỗi project.
 
 ## Đã xong
 - **01** `spawn claude ENOENT`: `server/claudeBin.js` resolve Claude CLI (env `CLAUDE_BIN`
@@ -57,7 +63,9 @@ PM → BA → DA → Dev → QC → PO. Server Express + WS, web React (Vite), 1
 
 ## Việc cần làm tiếp (TODO)
 1. **Theo dõi PR** — chờ maintainer review/merge. Thứ tự: **#4 trước**, rồi #7/#8/#10/#11
-   (đều stacked trên #4); #9 độc lập off `main`.
+   (stacked trên #4), **#12 sau #11**; #9 độc lập off `main`.
+0. **Chưa test vòng agent thật** cho storage workspace (materialize → agent ghi → sync back)
+   vì cần Claude account + quota. Chạy 1 session thật là verify nốt.
 2. **Issue #6 text** vẫn mô tả bản UI phức tạp cũ → chỉ sửa được nếu có quyền write upstream
    (hiện READ-only). `docs/issues/04,05` đã sửa về scope đã ship. Issue #10 (responsive) đã
    revert → nếu làm lại dùng layout **stacked** (không off-canvas drawer).
