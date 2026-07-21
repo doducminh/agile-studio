@@ -28,12 +28,19 @@ Paths in these docs are relative to the app folder `agile-studio/` (e.g.
 | [13](./13-optional-account-nickname.md) | Optional nickname; show nickname else email | Enhancement | P2 | S | 02 |
 | [14](./14-badge-weekly-fable-limits.md) | Badge: Weekly (+ Fable) limit next to 5h | Enhancement | P3 | S–M | — |
 | [15](./15-status-icon-and-legend.md) | Status icon + info legend for panel icons | Enhancement | P3 | S | — |
+| [16](./16-add-account-loading-state.md) | Add-account: no loading state, modal rewinds; new account's usage not fetched | Bug | P2 | S | 02, 11, 13 |
+| [17](./17-integration-connection-status.md) | Connection status for Storage & Discord bot (reason + retry) | Feature | P2 | M | 04, 08 |
+| [18](./18-usage-dialog-details.md) | Usage dialog: auth method, resets, claude.ai link, quota attribution | Enhancement | P3 | M | 02, 14 |
 
 **Priority key:** P0 = blocker (nothing works), P1 = high, P2 = planned, P3 = nice-to-have.
 **Effort key:** S ≈ hours, M ≈ 1–2 days, L ≈ several days.
 
 **09–15** were found while testing the 01–03 fixes (real login session): account-panel
 UX, responsive, and login-flow polish.
+
+**16–18** came out of the next round of real use: the add-account flow (16), no way to tell
+whether the configured storage / Discord bot is actually connected (17), and a usage dialog
+that lags behind Claude Code's own Account & Usage panel (18).
 
 ## Suggested order
 
@@ -43,9 +50,12 @@ UX, responsive, and login-flow polish.
 4. **05**, **08** — independent improvements, can land any time after 03.
 5. **11**, **12**, **13** — login-flow correctness (duplicate guard, single tab, nickname).
 6. **09**, **10**, **14**, **15** — account-panel & responsive polish.
+7. **16**, **17**, **18** — add-account flow, integration status, usage dialog.
 
 ## Milestones
 
 - **M1 — "Works on Windows"**: 01, 02, 03.
 - **M2 — "Storage & config"**: 04, 05, 08.
 - **M3 — "Account UX & responsive"**: 09, 10, 11, 12, 13, 14, 15.
+- **M4 — "Biết chuyện gì đang xảy ra"**: 16, 17, 18 (trạng thái rõ ràng: đang chờ gì,
+  kết nối được không, quota đi đâu). Làm local trước — chưa mở issue/PR trên upstream.

@@ -31,7 +31,14 @@ PM → BA → DA → Dev → QC → PO. Server Express + WS, web React (Vite), 1
 | `feat/project-management` | xoá project + bulk-add folder/git-repo (stacked trên #11) → **PR #12**. |
 | `feat/session-usage-metrics` | token + %5h mỗi công việc (stacked trên #12) → **PR #13**. |
 | `feat/responsive-stacked-10` | responsive stacked CSS (off `main`) → **PR #20** / issue #19. |
+| `fix/add-account-loading-16` | loading + chờ trạng thái khi thêm account, refresh usage account mới. **LOCAL** (chưa PR). |
+| `feat/integration-status-17` | trạng thái kết nối Storage + Discord bot (lý do + thử lại). **LOCAL**. |
+| `feat/usage-dialog-details-18` | dialog usage: auth method, reset ngắn, link claude.ai, phân bổ quota. **LOCAL**. |
 | `wip/local-01-15` | Snapshot an toàn (backup). |
+
+**16–18 làm LOCAL trước theo yêu cầu**: đã commit trên 3 nhánh riêng (như 3 PR) và merge
+`--no-ff` vào `personal/local-work`. **Chưa** tạo issue/PR trên `TranDuy13/agile-studio`,
+chưa push nhánh nào lên `fork`. Spec: `docs/issues/16..18-*.md` (thư mục riêng, không push).
 
 ## GitHub issues ↔ PRs (trên `TranDuy13/agile-studio`)
 Mọi issue do `doducminh` tạo → tự sửa body được (tác giả). Mọi PR đã gắn `Fixes #N` (auto-close khi merge).
@@ -78,16 +85,35 @@ Body issue #1,2,3,5,6 đã thêm banner "✅ Shipped in PR #N". Issue #14–18 m
 - **13** nickname tuỳ chọn (hiện nickname, nếu trống → email).
 - **14** dialog usage hiện dòng Fable (`fablePct`). **15** icon trạng thái + popover chú thích.
 - **05** file `.claude/settings.json` mặc định (permissions Read/Web, defaultMode acceptEdits).
+- **16** modal thêm account: `busy` tách khỏi `step` (không rewind về form đầu), spinner +
+  đếm giây + chặn đóng giữa chừng + bước "done"; `onDone(id)` → `AccountBadge` lấy usage
+  của đúng account vừa thêm.
+- **17** trạng thái kết nối: storage KHÔNG còn làm sập server khi DB lỗi (chạy degraded
+  in-memory + báo lý do + `retryStorage()`); mỗi backend có `ping()`; bot tự báo trạng thái
+  (`POST /api/bot/status`, heartbeat 15s, WS mở trước khi login Discord, nhận `bot:retry`);
+  `GET /api/integrations[?probe=1]` + `POST /api/integrations/{storage,bot}/retry`;
+  UI khối "Kết nối" trong sidebar (`web/src/IntegrationStatus.jsx`).
+- **18** dialog usage: `authMethod`, dòng "reset sau 2h", link claude.ai, nút ↻,
+  khối "Điều gì đang chiếm quota?" (toggle 24h/7 ngày) từ
+  `GET /api/accounts/:id/attribution` — gom session theo model/project.
 
 ## Việc cần làm tiếp (TODO)
 1. **Theo dõi PR** — chờ maintainer review/merge. Thứ tự: **#4** → #7/#8/#10/#11 (stacked #4)
    → **#12** (sau #11) → **#13** (sau #12); #9 độc lập off `main`.
 2. **Body issue tự sửa được** vì `doducminh` là tác giả (dù chỉ READ repo). Đã đồng bộ banner
    "Shipped" cho #1,2,3,5,6. Responsive (spec 10) đã làm xong → issue #19 / PR #20.
-3. **Storage postgres — ceiling còn lại:** merge whole-document, poll 4s. Nếu cần realtime/
+3. **DB có tự seed không? (đã kiểm)** Không có dữ liệu demo. Chỉ một đường: **DB rỗng lúc
+   khởi động → nạp toàn bộ `<DATA_DIR>/studio.json` của máy đó** (`readStudioJson()` trong
+   `sqlite.js`/`postgres.js`), bảng tạo tự động bằng `CREATE TABLE IF NOT EXISTS`.
+   `accounts.json` KHÔNG vào DB. Trước đây im lặng; sau #17 có log server + hiện
+   "đã nạp dữ liệu sẵn có từ studio.json" trong modal trạng thái (`seededFrom`).
+   Đã verify bằng sqlite + DATA_DIR có studio.json → `/api/projects` trả đúng dữ liệu cũ.
+4. **Nếu muốn đưa 16–18 lên upstream:** tạo issue + PR (base `main`, stacked sau #11/#13 vì
+   #17 đụng `server/store/*`, #18 đụng `server/index.js` phần session metrics của PR #13).
+5. **Storage postgres — ceiling còn lại:** merge whole-document, poll 4s. Nếu cần realtime/
    throughput cao thì đổi sang change-feed per-row (LISTEN/NOTIFY) thay vì poll. Hiện đủ
    cho vài máy cá nhân.
-4. **Ghi chú kỹ thuật:** ~~`claude auth login --claudeai`~~ đã kiểm — VẪN hợp lệ trên CLI
+6. **Ghi chú kỹ thuật:** ~~`claude auth login --claudeai`~~ đã kiểm — VẪN hợp lệ trên CLI
    2.1.215 (`--claudeai` là mặc định; có thêm `--email` prefill). Schema plugin
    (`enabledPlugins`) vẫn tuỳ phiên bản.
 
