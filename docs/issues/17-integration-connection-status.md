@@ -46,9 +46,16 @@ và **thử lại được** (kể cả ép tải lại trang).
 
 **Web** (`web/src/IntegrationStatus.jsx`, `App.jsx`, `styles.css`)
 - Khối "Kết nối" dưới panel account: 2 dòng có chấm màu (🗄 Storage · driver, 🤖 Discord bot).
-- Bấm vào → modal chi tiết: driver/đích (che mật khẩu DB), lý do lỗi, gợi ý xử lý, thời điểm ghi
-  thành công gần nhất… + nút **↻ Thử lại kết nối** và **⟳ Tải lại trang**.
+- Bấm vào → modal chi tiết: driver/đích, lý do lỗi, gợi ý xử lý, thời điểm ghi thành công gần
+  nhất… + nút **↻ Thử lại kết nối** và **⟳ Tải lại trang**.
 - Poll 20s + cập nhật ngay khi có sự kiện `integrations:changed`.
+
+**Tinh chỉnh UI (đợt sau)**
+- **Đích storage là dữ liệu nhạy cảm**: server đã bỏ mật khẩu; UI **che toàn bộ** bằng chấm và
+  có nút 👁 để hiện; chuỗi **xuống dòng (word-break)** thay vì scroll ngang khó đọc.
+- **Nút "Thử lại" chỉ hiện khi có tác dụng**: storage phải là `postgres` VÀ đang lỗi
+  (json/sqlite hoặc đang OK → không có nút, chỉ còn "Đóng" / "Tải lại trang").
+- Modal có `max-height:90vh` + cuộn, nên nội dung dài (vd bảng limit) không tràn khỏi màn hình.
 
 ## Ghi chú — DB có "tự seed" dữ liệu không?
 
