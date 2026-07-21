@@ -37,6 +37,12 @@ Flow `👤 Thêm account Claude` → `▶ Lấy link đăng nhập` → dán cod
   `refreshOne(id)` (fallback `refreshAll()` nếu không có id); dùng cho cả thêm mới và relogin.
 - `web/src/styles.css`: `.spinner`, `.modal-busy`, `.modal-ok`.
 
+## Tinh chỉnh kèm theo (panel account)
+
+- **Danh sách account chỉ cao vừa ~2 account**, nhiều hơn thì cuộn trong `.acct-list`
+  (`max-height`), thanh cuộn mảnh (`.thin-scroll`, custom cho bớt thô) — dùng lại cho
+  sidebar/modal/scan list.
+
 ## Kiểm thử
 
 1. Thêm account → sau khi bấm `Xác nhận & thêm`, modal **vẫn ở bước code**, mờ đi, có spinner
