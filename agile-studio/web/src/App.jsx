@@ -8,6 +8,7 @@ import DocsPanel from "./DocsPanel.jsx";
 import SettingsModal from "./SettingsModal.jsx";
 import AddProjectModal from "./AddProjectModal.jsx";
 import ScheduleTab from "./ScheduleTab.jsx";
+import DocJobs from "./docs/DocJobs.jsx";
 import { ROLE_ORDER, ROLE_META, presetOf } from "./presets.js";
 
 // Thông báo desktop (nếu user bật + đã cấp quyền).
@@ -182,7 +183,8 @@ export default function App() {
               <div className="tabs">
                 <button className={tab === "flow" ? "on" : ""} onClick={() => setTab("flow")}>Sessions</button>
                 <button className={tab === "req" ? "on" : ""} onClick={() => setTab("req")}>Requirement</button>
-                <button className={tab === "docs" ? "on" : ""} onClick={() => setTab("docs")}>Tài liệu</button>
+                <button className={tab === "docs" ? "on" : ""} onClick={() => setTab("docs")}>Agile</button>
+                <button className={tab === "prodocs" ? "on" : ""} onClick={() => setTab("prodocs")}>📚 Tài liệu</button>
                 <button className={tab === "sched" ? "on" : ""} onClick={() => setTab("sched")}>⏰ Lịch</button>
               </div>
               {tab === "flow" && (
@@ -213,6 +215,8 @@ export default function App() {
             ) : tab === "req" ? (
               <Requirements projectId={active.id} version={reqVersion}
                 onAnalyze={(prefill) => openRun(prefill)} />
+            ) : tab === "prodocs" ? (
+              <DocJobs project={active} />
             ) : tab === "sched" ? (
               <ScheduleTab projects={projects} defaultProjectId={active.id} models={models} version={schedVersion} />
             ) : (

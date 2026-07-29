@@ -14,6 +14,7 @@ import { loadAccounts, pickAccount, fetchModels, fetchUsage, fetchProfile, addAc
 import { runClaude, runClaudeStream, copySessionTranscript, killChild, ROLE_ORDER, ROLE_META } from "./runner.js";
 import { resolveWorkspace, buildRolePrompt, learnFromRun, listSkills, roleHasOutputs,
   saveSkill, listDocs, readDoc, writeDoc } from "./scaffold.js";
+import { registerDocRoutes } from "./routes/docgen.js";
 
 const app = express();
 app.use(cors());
@@ -30,6 +31,7 @@ function broadcast(msg) {
   const s = JSON.stringify(msg);
   for (const ws of clients) if (ws.readyState === ws.OPEN) ws.send(s);
 }
+registerDocRoutes(app, broadcast);
 
 // Nhiều session chạy SONG SONG (như nhiều tab Claude Code). Mỗi session có state riêng.
 const sessions = new Map(); // sessionId -> session
