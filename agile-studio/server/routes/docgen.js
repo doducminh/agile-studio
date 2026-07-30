@@ -12,14 +12,21 @@ import { listStandards, getStandard, publicStandard, composeStandard, listCompos
 import { runSurvey } from "../docgen/survey.js";
 import { ensureClaudeOnPath } from "../docgen/claudeBin.js";
 import { buildPlan, mergeRevision, planToPreset, applyPreset, planStats } from "../docgen/plan.js";
-import { estimateSurvey, estimateRevise, estimatePlan, windowsOf } from "../docgen/estimate.js";
+import { estimateSurvey, estimateRevise, estimatePlan, estimateSection, windowsOf } from "../docgen/estimate.js";
 import { gitAuthors, scanPreview } from "../docgen/gitscan.js";
 import { TONES } from "../docgen/tones.js";
+import { createWriteRun, pendingSections, ENGINES, headCommit } from "../docgen/write.js";
+import { normalizeSection, sectionMetrics, jobMetrics } from "../docgen/ir.js";
+import { detectStale, applyStale } from "../docgen/stale.js";
+import { detectPython, forgetPython, renderDocx } from "../docgen/exporter.js";
 
 const pexecFile = promisify(execFile);
 
 // Surveys currently running, so they can be stopped and so a second start is refused.
 const running = new Map(); // jobId -> { child, startedAt }
+// Write runs currently in flight. Separate from `running` because a write run is a controller
+// (many sessions, switchable engine), not a single child process.
+const writes = new Map();  // jobId -> WriteRun
 
 const bad = (res, code, msg) => res.status(code).json({ error: msg });
 
@@ -72,6 +79,17 @@ export function registerDocRoutes(app, broadcast = () => {}) {
     if (job.status === "surveying")
       docgenStore.patchJob(job.id, { status: "error",
         error: { kind: "interrupted", message: "Server khởi động lại khi đang khảo sát — bấm Tiếp tục để chạy lại." } });
+    // Same for a write run (test case 11). Sections that made it to the store are kept; the ones
+    // that were mid-flight go back to pending so "Tiếp tục" picks up exactly those.
+    if (job.status === "writing") {
+      const plan = docgenStore.getPlan(job.id);
+      for (const d of plan?.docs || [])
+        for (const s of d.sections || []) if (s.status === "writing")
+          docgenStore.patchPlanSection(job.id, s.id, { status: "pending" });
+      docgenStore.patchJob(job.id, { status: "error",
+        error: { kind: "interrupted",
+          message: "Server khởi động lại khi đang viết — các mục đã viết vẫn còn, bấm Tiếp tục để viết nốt." } });
+    }
   }
 
   // ---- standards & presets (studio-wide) ----
@@ -222,9 +240,19 @@ export function registerDocRoutes(app, broadcast = () => {}) {
     if (!job) return bad(res, 404, "Không thấy bộ tài liệu");
     const patch = {};
     for (const k of ["name", "scope", "meta", "style", "run"]) if (req.body[k] !== undefined) patch[k] = req.body[k];
+    // Changing the engine while a run is in flight is a supported move (Q9): the live run drops
+    // the sessions it no longer needs and restarts with whatever is still unwritten. Sections
+    // already in the store are untouched, so no progress is lost.
+    const nextEngine = req.body.run?.engine;
+    let switched = false;
+    if (nextEngine) {
+      if (!ENGINES.includes(nextEngine)) return bad(res, 400, "Cách chạy không hợp lệ");
+      const live = writes.get(job.id);
+      if (live) switched = live.setEngine(nextEngine);
+    }
     const next = docgenStore.patchJob(job.id, patch);
     emit(next);
-    res.json({ job: withPlanSummary(next) });
+    res.json({ job: withPlanSummary(next), switched });
   });
 
   app.delete("/api/doc-jobs/:jid", (req, res) => {
@@ -232,6 +260,8 @@ export function registerDocRoutes(app, broadcast = () => {}) {
     if (!job) return bad(res, 404, "Không thấy bộ tài liệu");
     const live = running.get(job.id);
     if (live) { killChild(live.child); running.delete(job.id); }
+    const run = writes.get(job.id);
+    if (run) { run.stop(); writes.delete(job.id); }
     docgenStore.deleteJob(job.id);
     broadcast({ type: "doc:job", jobId: job.id, removed: true });
     res.json({ ok: true });
@@ -257,11 +287,14 @@ export function registerDocRoutes(app, broadcast = () => {}) {
     res.json({ ok: true, job: withPlanSummary(docgenStore.getJob(job.id)) });
   });
 
+  // One "⏸ Dừng" button for both stages: whatever is running for this job stops.
   app.post("/api/doc-jobs/:jid/stop", (req, res) => {
+    const run = writes.get(req.params.jid);
+    if (run) { run.stop(); return res.json({ ok: true, stopped: "write" }); }
     const live = running.get(req.params.jid);
     if (!live) return bad(res, 404, "Không có phiên nào đang chạy");
     killChild(live.child);
-    res.json({ ok: true });
+    res.json({ ok: true, stopped: "survey" });
   });
 
   // ---- plan ----
@@ -365,6 +398,194 @@ export function registerDocRoutes(app, broadcast = () => {}) {
     res.json({ plan, stats: planStats(plan, job.style?.depth) });
   });
 
+  // ---- D2: writing ----------------------------------------------------------------------
+  // plan-approved | paused | error | editing -> writing. Re-calling this is how "Tiếp tục" works:
+  // the run only claims sections that have no IR yet (plus the stale ones), so nothing already
+  // finished is written twice (test cases 8 and 11).
+  app.post("/api/doc-jobs/:jid/write", (req, res) => {
+    const job = docgenStore.getJob(req.params.jid);
+    if (!job) return bad(res, 404, "Không thấy bộ tài liệu");
+    if (writes.has(job.id)) return bad(res, 409, "Bộ tài liệu này đang viết");
+    if (running.has(job.id)) return bad(res, 409, "Bộ tài liệu này đang khảo sát");
+    const plan = docgenStore.getPlan(job.id);
+    if (!plan?.approvedAt) return bad(res, 400, "Chưa chốt dàn ý — duyệt dàn ý trước khi viết.");
+    const std = standardFor(job);
+    if (!std) return bad(res, 400, "Chuẩn không còn tồn tại");
+    const project = store.getProject(job.projectId);
+    if (!project || !existsSync(project.repo_path)) return bad(res, 400, "Không đọc được thư mục repo của project");
+    const account = accountFor();
+    if (!account) return bad(res, 400, "Chưa có account nào đang bật — thêm account rồi thử lại.");
+
+    const only = Array.isArray(req.body?.only) && req.body.only.length ? req.body.only.map(String) : null;
+    const engine = ENGINES.includes(req.body?.engine)
+      ? req.body.engine : (job.run?.engine || plan.engine || "per-doc");
+    const targets = pendingSections(job.id, plan, { only });
+    if (!targets.length)
+      return bad(res, 400, only
+        ? "Những mục đã chọn không cần viết lại (đã xong, hoặc đang được đánh dấu sửa tay)."
+        : "Không còn mục nào cần viết. Muốn viết lại thì chọn mục cụ thể hoặc bấm ↻ để tìm mục đã cũ.");
+
+    const run = createWriteRun({
+      job, std, plan, repoPath: project.repo_path,
+      accounts: enabledAccounts(), account, appSettings: store.getSettings(),
+      engine, only, broadcast,
+    });
+    writes.set(job.id, run);
+    run.promise
+      .catch((err) => {
+        const cur = docgenStore.getJob(job.id);
+        if (!cur) return;
+        emit(docgenStore.patchJob(job.id, {
+          status: "error", error: { kind: "write", message: String(err.message).slice(0, 500) },
+          write: { ...(cur.write || {}), finishedAt: Date.now(), activity: "" },
+        }));
+      })
+      .finally(() => { writes.delete(job.id); });
+
+    docgenStore.patchJob(job.id, { run: { engine } });
+    res.json({ ok: true, engine, sections: targets.length,
+      job: withPlanSummary(docgenStore.getJob(job.id)) });
+  });
+
+  // Everything the progress screen needs in one call: the outline with its per-section state, the
+  // content itself, the roll-up numbers and the export history.
+  app.get("/api/doc-jobs/:jid/ir", (req, res) => {
+    const job = docgenStore.getJob(req.params.jid);
+    if (!job) return bad(res, 404, "Không thấy bộ tài liệu");
+    const plan = docgenStore.getPlan(job.id);
+    const ir = docgenStore.getIr(job.id);
+    const { total, docs } = jobMetrics(ir, plan);
+    res.json({
+      job: withPlanSummary(job), plan, ir, metrics: total, perDoc: docs,
+      exports: docgenStore.listExports(job.id),
+      writing: writes.has(job.id),
+      standard: publicStandard(standardFor(job)),
+    });
+  });
+
+  // Q20 — hand editing. Free: no model runs, so there is no token dialog on this path.
+  app.put("/api/doc-jobs/:jid/ir", async (req, res) => {
+    const job = docgenStore.getJob(req.params.jid);
+    if (!job) return bad(res, 404, "Không thấy bộ tài liệu");
+    const plan = docgenStore.getPlan(job.id);
+    const found = findPlanSection(plan, String(req.body?.id || ""));
+    if (!found) return bad(res, 404, "Không thấy mục này trong dàn ý");
+    if (!Array.isArray(req.body?.blocks)) return bad(res, 400, "Thiếu danh sách khối nội dung");
+
+    const project = store.getProject(job.projectId);
+    const commit = await headCommit(project?.repo_path || ".");
+    const key = `${found.doc.key}/${found.section.num}`;
+    const ir = normalizeSection(
+      { blocks: req.body.blocks, traces: req.body.traces, sources: req.body.sources },
+      found.section, { docKey: found.doc.key, commit, sources: found.section.sources });
+    if (!ir.blocks.length) return bad(res, 400, "Mục phải còn ít nhất một khối nội dung.");
+
+    const saved = docgenStore.putIrSection(job.id, key, { ...ir, editedAt: Date.now() });
+    const m = sectionMetrics(saved);
+    // `edited` is a flag that survives every later status change: it is what keeps the writing
+    // agent out of this section until the user explicitly gives it back.
+    docgenStore.patchPlanSection(job.id, found.section.id, {
+      status: "edited", edited: true, editedAt: Date.now(), words: m.words, error: null,
+    });
+    pushMetrics(job.id);
+    broadcast({ type: "doc:section", jobId: job.id, sectionId: found.section.id,
+      docKey: found.doc.key, num: found.section.num, status: "edited", metrics: m });
+    res.json({ ir: saved, metrics: m, plan: docgenStore.getPlan(job.id) });
+  });
+
+  // "Bỏ đánh dấu đã sửa tay" — the only way an agent is allowed to overwrite hand-written text.
+  // The UI warns first; this endpoint does not guess.
+  app.post("/api/doc-jobs/:jid/ir/unedit", (req, res) => {
+    const job = docgenStore.getJob(req.params.jid);
+    if (!job) return bad(res, 404, "Không thấy bộ tài liệu");
+    const plan = docgenStore.getPlan(job.id);
+    const found = findPlanSection(plan, String(req.body?.id || ""));
+    if (!found) return bad(res, 404, "Không thấy mục này trong dàn ý");
+    const key = `${found.doc.key}/${found.section.num}`;
+    const has = !!docgenStore.getIrSection(job.id, key);
+    const next = docgenStore.patchPlanSection(job.id, found.section.id, {
+      edited: false, editedAt: null,
+      status: !has ? "pending" : (found.section.staleFiles?.length ? "stale" : "written"),
+    });
+    broadcast({ type: "doc:section", jobId: job.id, sectionId: found.section.id,
+      docKey: found.doc.key, num: found.section.num, status: next.status });
+    res.json({ section: next, plan: docgenStore.getPlan(job.id) });
+  });
+
+  // Q21 — which sections point at files that changed since they were written. Free: `git diff`
+  // and a set intersection, no model.
+  app.post("/api/doc-jobs/:jid/stale", async (req, res) => {
+    const job = docgenStore.getJob(req.params.jid);
+    if (!job) return bad(res, 404, "Không thấy bộ tài liệu");
+    const plan = docgenStore.getPlan(job.id);
+    if (!plan) return bad(res, 400, "Chưa có dàn ý");
+    const project = store.getProject(job.projectId);
+    const result = await detectStale({ plan, ir: docgenStore.getIr(job.id), repoPath: project?.repo_path });
+    const changed = applyStale(docgenStore, job.id, docgenStore.getPlan(job.id), result);
+    const next = docgenStore.getPlan(job.id);
+    if (changed) emit(docgenStore.getJob(job.id), { plan: next });
+    res.json({ ...result, changed, plan: next });
+  });
+
+  // ---- D2: export -----------------------------------------------------------------------
+  app.get("/api/doc-tools", async (req, res) => {
+    if (req.query.recheck === "1") forgetPython();
+    res.json({ python: await detectPython({ force: req.query.recheck === "1" }) });
+  });
+
+  app.get("/api/doc-jobs/:jid/exports", (req, res) => {
+    if (!docgenStore.getJob(req.params.jid)) return bad(res, 404, "Không thấy bộ tài liệu");
+    res.json({ exports: docgenStore.listExports(req.params.jid) });
+  });
+
+  // Content lives in the Studio; exporting is a separate action with its own destination (Q10).
+  // Free of tokens — it is all code.
+  app.post("/api/doc-jobs/:jid/export", async (req, res) => {
+    const job = docgenStore.getJob(req.params.jid);
+    if (!job) return bad(res, 404, "Không thấy bộ tài liệu");
+    const plan = docgenStore.getPlan(job.id);
+    if (!plan) return bad(res, 400, "Chưa có dàn ý");
+    const formats = (Array.isArray(req.body?.formats) ? req.body.formats : ["docx"]).map(String);
+    const unsupported = formats.filter((f) => f !== "docx");
+    if (unsupported.length)
+      return bad(res, 400, `Bước này chỉ xuất được .docx. Định dạng ${unsupported.join(", ")} thuộc feature xuất PDF.`);
+    const destDir = String(req.body?.destDir || "").trim();
+    if (!destDir) return bad(res, 400, "Chưa chọn nơi lưu");
+    const keys = Array.isArray(req.body?.docs) && req.body.docs.length ? req.body.docs.map(String) : null;
+    const draft = req.body?.draft !== false;
+
+    const ir = docgenStore.getIr(job.id);
+    const specs = exportSpecs({ job, std: standardFor(job), plan, ir, keys, draft });
+    if (!specs.length) return bad(res, 400, "Không có tài liệu nào để xuất");
+
+    const out = await renderDocx({ jobId: job.id, docs: specs, destDir, draft });
+    if (out.locked) return res.status(400).json({ error: out.error, locked: true, reason: out.reason, tried: out.tried });
+    // A file that could not be written is a *skipped file with a name*, not a failed export: the
+    // usual cause is "it is open in Word right now", and the user needs to be told which one
+    // (RULESET §6 #3). Only a renderer that produced nothing at all is a real failure.
+    if (!out.files?.length && !out.skipped?.length) return bad(res, 400, out.error || "Xuất thất bại");
+
+    const rec = docgenStore.addExport(job.id, {
+      format: "docx", destDir, draft, python: out.python || null,
+      files: (out.files || []).map((f) => ({ path: f.path, bytes: f.bytes, title: f.title, counts: f.counts })),
+      skipped: out.skipped || [], warnings: out.warnings || [], counts: out.counts || {},
+    });
+    broadcast({ type: "doc:export", jobId: job.id, export: rec });
+    res.json({ export: rec, exports: docgenStore.listExports(job.id) });
+  });
+
+  // Roll the derived numbers back onto the job so the board card is right without opening the job.
+  function pushMetrics(jobId) {
+    const cur = docgenStore.getJob(jobId);
+    if (!cur) return;
+    const { total } = jobMetrics(docgenStore.getIr(jobId), docgenStore.getPlan(jobId));
+    const job = docgenStore.patchJob(jobId, {
+      metrics: { ...cur.metrics, sections: total.sections, done: total.done, words: total.words,
+        pages: total.pages, tables: total.tables, figures: total.figures },
+    });
+    broadcast({ type: "doc:job", jobId, job });
+  }
+
   // ---- estimates ----
   // Every button in the docgen UI shows a forecast; this is where the numbers come from.
   app.get("/api/doc-jobs/:jid/estimate", async (req, res) => {
@@ -380,13 +601,27 @@ export function registerDocRoutes(app, broadcast = () => {}) {
     const account = accountFor();
     let usage = null;
     if (account && req.query.usage === "1") usage = await fetchUsage(account.configDir).catch(() => null);
+
+    // What the write buttons actually cost, which is not the same as "the whole plan": a resumed
+    // run pays only for what is left, and "viết lại N mục đã cũ" only for the stale ones.
+    const depth = job.style?.depth;
+    const priceOf = (list) => list.reduce((n, t) => n + estimateSection(t.section, depth), 0);
+    const rest = plan ? pendingSections(job.id, plan, { only: null }) : [];
+    const staleAll = (plan?.docs || []).flatMap((d) => (d.sections || [])
+      .filter((s) => s.status === "stale").map((s) => ({ doc: d, section: s })));
+    const staleBulk = staleAll.filter((t) => !t.section.edited);
+
     res.json({
       survey: estimateSurvey(sectionCount),
       revise: estimateRevise(sectionCount),
       write: write.tokens, sections: write.sections,
+      pending: { sections: rest.length, tokens: priceOf(rest) },
+      stale: { sections: staleBulk.length, tokens: priceOf(staleBulk),
+        held: staleAll.length - staleBulk.length },
       windows: windowsOf(write.tokens, settings.tokensPer5h),
       tokensPer5h: settings.tokensPer5h, threshold: settings.tokenThreshold,
       account: account ? { id: account.id, label: account.label } : null,
+      accounts: enabledAccounts().length,
       usage,
     });
   });
@@ -462,16 +697,63 @@ export function registerDocRoutes(app, broadcast = () => {}) {
   }
 }
 
+// A section is addressed by its plan id everywhere in the API; this is the one place that resolves
+// it back to the document it belongs to.
+function findPlanSection(plan, id) {
+  for (const doc of plan?.docs || []) {
+    const section = (doc.sections || []).find((s) => s.id === id);
+    if (section) return { doc, section };
+  }
+  return null;
+}
+
+// Document identifier: the prefix the user chose for this set plus a short tag per document, so
+// six files of one standard do not all carry the same id.
+function docIdFor(job, doc) {
+  const prefix = String(job.meta?.docIdPrefix || "").trim();
+  const tag = String(doc.short || doc.key).replace(/[^A-Za-z0-9]+/g, "").toUpperCase().slice(0, 6);
+  return prefix ? `${prefix}-${tag}` : tag;
+}
+
+// The payload render.py consumes. Sections switched off at approval are not in the file at all;
+// sections not yet written are, so the reader can see what is still missing.
+function exportSpecs({ job, std, plan, ir, keys, draft }) {
+  const version = job.meta?.history?.at(-1)?.version || "0.1";
+  const out = [];
+  for (const d of plan.docs || []) {
+    if (keys && !keys.includes(d.key)) continue;
+    const sections = (d.sections || [])
+      .filter((s) => s.enabled !== false && s.status !== "skipped")
+      .map((s) => ({ num: s.num, title: s.title, kind: s.kind, ir: ir[`${d.key}/${s.num}`] || null }));
+    if (!sections.length) continue;
+    const base = String(d.file || `${d.title}.docx`).replace(/\.docx$/i, "");
+    out.push({
+      key: d.key, file: `${base} v${version}.docx`, title: d.title,
+      project: job.projectName || "", docId: docIdFor(job, d), version,
+      classification: job.meta?.classification || "",
+      docStatus: draft ? "Bản nháp" : (job.meta?.docStatus || ""),
+      standard: std?.standard || std?.label || "",
+      sections,
+    });
+  }
+  return out;
+}
+
 // Cards need the plan headline without pulling the whole outline over the wire.
 function withPlanSummary(job) {
   if (!job) return job;
   const std = standardFor(job);
   const plan = docgenStore.getPlan(job.id);
+  // Written / edited / stale sections per document, so the board card can show a real progress
+  // ring instead of a fixed number per status.
+  const written = plan ? jobMetrics(docgenStore.getIr(job.id), plan) : null;
+  const doneOf = new Map((written?.docs || []).map((d) => [d.key, d]));
   const docs = plan
     ? plan.docs.map((d) => ({ key: d.key, title: d.title, file: d.file,
-        sections: d.sections.filter((s) => s.enabled !== false).length }))
+        sections: d.sections.filter((s) => s.enabled !== false).length,
+        done: doneOf.get(d.key)?.done || 0, pages: doneOf.get(d.key)?.pages || 0 }))
     : (std?.docs || []).map((d) => ({ key: d.key, title: d.title,
-        file: `${job.projectName} — ${d.short || d.title}.docx`, sections: d.sections.length }));
+        file: `${job.projectName} — ${d.short || d.title}.docx`, sections: d.sections.length, done: 0 }));
   // Which Word template this set will actually use: its own beats the studio-wide default.
   const gset = docgenStore.getSettings();
   const own = job.style?.templatePath || "";
@@ -485,5 +767,11 @@ function withPlanSummary(job) {
     docs,
     planApproved: !!plan?.approvedAt,
     planRevision: plan?.revision || 0,
+    progress: written ? written.total : null,
+    staleCount: (plan?.docs || []).flatMap((d) => d.sections || [])
+      .filter((s) => s.status === "stale").length,
+    editedCount: (plan?.docs || []).flatMap((d) => d.sections || [])
+      .filter((s) => s.edited).length,
+    exportCount: docgenStore.listExports(job.id).length,
   };
 }

@@ -35,7 +35,7 @@ function shortSource(p) {
   return parts.length <= 2 ? s : "…/" + parts.slice(-2).join("/");
 }
 
-export default function DocOutline({ jobId, settings, onSettings, onBack, onJobChanged }) {
+export default function DocOutline({ jobId, settings, onSettings, onBack, onJobChanged, onWrite }) {
   const [job, setJob] = useState(null);
   const [plan, setPlan] = useState(null);
   const [stats, setStats] = useState(null);
@@ -286,7 +286,12 @@ export default function DocOutline({ jobId, settings, onSettings, onBack, onJobC
           </div>
           <div className="dg-banner-acts">
             <button className="ghost" onClick={onBack}>← Về danh sách</button>
-            <button className="primary" disabled title="Viết nội dung là feature kế tiếp (D2)">▶ Bắt đầu viết</button>
+            {/* The forecast and the token dialog live on the progress screen, so this button only
+                takes you there — it never starts a run behind the user's back. */}
+            <button className="primary" onClick={() => onWrite?.()}
+              title="Sang màn theo dõi tiến độ, nơi có dự báo token và nút bắt đầu">
+              ▶ Bắt đầu viết →
+            </button>
           </div>
         </div>
       )}

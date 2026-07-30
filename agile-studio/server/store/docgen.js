@@ -163,6 +163,50 @@ export const docgenStore = {
     return clone(p);
   },
 
+  // A single section of the outline, patched in place. Section status is what both progress
+  // views read from, so writing, manual edits and stale detection all funnel through here.
+  patchPlanSection(jobId, sectionId, patch) {
+    const p = data.plans[jobId];
+    if (!p) return null;
+    for (const d of p.docs || []) {
+      const s = (d.sections || []).find((x) => x.id === sectionId);
+      if (!s) continue;
+      Object.assign(s, patch);
+      persist();
+      return clone(s);
+    }
+    return null;
+  },
+
+  // ---- IR (D2): one entry per section, keyed "<docKey>/<num>" ----
+  // Kept as a flat map rather than nested per document: a section is written, edited and rendered
+  // on its own, and a flat key is what the writing agent's output file name maps to.
+  getIr(jobId) { return clone(data.ir[jobId]) || {}; },
+  getIrSection(jobId, key) { return clone(data.ir[jobId]?.[key]) || null; },
+  putIrSection(jobId, key, section) {
+    const bag = (data.ir[jobId] ||= {});
+    bag[key] = { ...section, key, updatedAt: Date.now() };
+    persist();
+    return clone(bag[key]);
+  },
+  deleteIrSection(jobId, key) {
+    if (!data.ir[jobId]?.[key]) return false;
+    delete data.ir[jobId][key];
+    persist();
+    return true;
+  },
+
+  // ---- exports (D2 .docx · D5 PDF) ----
+  listExports(jobId) { return clone(data.exports[jobId]) || []; },
+  addExport(jobId, rec) {
+    const list = (data.exports[jobId] ||= []);
+    const row = { id: nextId("dx"), at: Date.now(), ...rec };
+    list.unshift(row);
+    if (list.length > 60) list.length = 60;   // a history, not an archive
+    persist();
+    return clone(row);
+  },
+
   // ---- presets (studio-wide, reusable across projects) ----
   listPresets() { return clone(Object.values(data.presets).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))); },
   getPreset(id) { return clone(data.presets[id]) || null; },

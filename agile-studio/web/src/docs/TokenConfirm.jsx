@@ -6,6 +6,7 @@ export const WORK_LABELS = {
   survey: "Khảo sát & đề xuất dàn ý",
   revise: "Đề xuất lại dàn ý",
   write: "Viết nội dung cả bộ",
+  rewrite: "Viết lại các mục đã cũ",
 };
 
 export function fmtTokens(n) {
