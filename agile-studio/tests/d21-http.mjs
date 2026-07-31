@@ -269,7 +269,9 @@ console.log("\n[nơi lưu khi xuất]");
 {
   const r = await get("/api/doc-dests");
   ok("GET /api/doc-dests → 200", r.status === 200);
-  ok("trả 3 nơi lưu", r.body.dests.length === 3, String(r.body.dests.length));
+  ok("trả 2 nơi lưu", r.body.dests.length === 2, String(r.body.dests.length));
+  ok("KHÔNG còn nút 'Thư mục dữ liệu Studio'", !r.body.dests.some((d) => d.id === "data"),
+    JSON.stringify(r.body.dests.map((d) => d.id)));
   ok("mỗi nơi có trạng thái gitignore", r.body.dests.every((d) => d.git && "ignored" in d.git),
     JSON.stringify(r.body.dests.map((d) => d.git)));
   const repo = r.body.dests.find((d) => d.id === "repo");

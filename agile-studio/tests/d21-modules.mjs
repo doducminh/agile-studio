@@ -177,7 +177,9 @@ console.log("\n[dests.js — nơi lưu khi xuất]");
   const { existsSync } = await import("node:fs");
 
   const list = dests.destCandidates();
-  ok("có đúng 3 nơi lưu sẵn", list.length === 3, String(list.length));
+  ok("có đúng 2 nơi lưu sẵn", list.length === 2, String(list.length));
+  ok("KHÔNG còn nút 'Thư mục dữ liệu Studio'", !list.some((d) => d.id === "data"),
+    JSON.stringify(list.map((d) => d.id)));
   ok("mỗi nơi có id/label/path/hint",
     list.every((d) => d.id && d.label && d.path && d.hint), JSON.stringify(list.map((d) => d.id)));
   ok("có đúng một nơi được đề xuất mặc định",
@@ -208,8 +210,12 @@ console.log("\n[dests.js — nơi lưu khi xuất]");
   ok("dirInfo báo đúng tồn tại", dests.dirInfo(dests.DEST_REPO.replace(/exports$/, "server")).isDir === true);
   ok("dirInfo báo đúng không tồn tại", dests.dirInfo("Z:/khong-ton-tai").exists === false);
 
-  const made = dests.ensureDir(dests.DEST_DATA);
+  // Không dùng DEST_DATA nữa: nó không còn là nơi lưu gợi ý, tạo ra chỉ để lại một thư mục rỗng
+  // vĩnh viễn trong <dataDir>. Dựng rồi dọn một thư mục thăm dò thay vào đó.
+  const probe = dests.DEST_DATA + "-probe-" + Date.now();
+  const made = dests.ensureDir(probe);
   ok("ensureDir tạo được thư mục", existsSync(made));
+  (await import("node:fs")).rmSync(probe, { recursive: true, force: true });
 }
 
 // ---- demo.js --------------------------------------------------------------------------------

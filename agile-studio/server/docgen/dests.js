@@ -28,6 +28,9 @@ function downloadsDir() {
 }
 
 export const DEST_REPO = join(APP_ROOT, "exports");
+// Không còn là một nút gợi ý (chủ repo bỏ "Thư mục dữ liệu Studio": <dataDir> là chỗ của state và
+// log, người dùng không có việc gì phải mở nó để lấy tài liệu). Vẫn export vì test dùng nó làm một
+// đường dẫn CHẮC CHẮN nằm ngoài repo git.
 export const DEST_DATA = join(DATA_DIR, "exports");
 
 // Danh sách nút. `id` là thứ UI ghi nhớ, không phải đường dẫn — đổi máy thì đường dẫn khác nhưng nút
@@ -39,8 +42,6 @@ export function destCandidates() {
       preferred: true },
     { id: "downloads", label: "Tải xuống", path: downloadsDir(),
       hint: "Thư mục tải về của hệ điều hành. Chỗ ai cũng biết tìm, không làm bẩn repo." },
-    { id: "data", label: "Thư mục dữ liệu Studio", path: DEST_DATA,
-      hint: "Cùng chỗ với docgen.json và run.log. Dùng được cả khi chạy bản đã đóng gói, không còn repo source." },
   ];
 }
 
