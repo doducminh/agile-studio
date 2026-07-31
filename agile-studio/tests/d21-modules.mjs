@@ -210,6 +210,16 @@ console.log("\n[dests.js — nơi lưu khi xuất]");
   ok("dirInfo báo đúng tồn tại", dests.dirInfo(dests.DEST_REPO.replace(/exports$/, "server")).isDir === true);
   ok("dirInfo báo đúng không tồn tại", dests.dirInfo("Z:/khong-ton-tai").exists === false);
 
+  // `revealDir` phải nói ra nó mở ở ĐÂU: cửa sổ mở trên máy chạy server, không phải máy đang xem
+  // trình duyệt. Giao diện dựa vào `host` để nói đúng thay vì im lặng (xem chú thích trong dests.js).
+  // KHÔNG gọi revealDir thật ở đây — nó bật một cửa sổ Explorer lên màn hình người đang chạy test.
+  const src = await (await import("node:fs")).promises.readFile(
+    new URL("../server/docgen/dests.js", import.meta.url), "utf8");
+  ok("revealDir trả về host của máy chạy server", /host: hostname\(\)/.test(src));
+  ok("revealDir trả object chứ không phải true trần", /return out;/.test(src) && !/return true;/.test(src));
+  ok("thư mục không tồn tại thì revealDir ném lỗi, không im lặng",
+    /throw new Error\("Thư mục không tồn tại/.test(src));
+
   // Không dùng DEST_DATA nữa: nó không còn là nơi lưu gợi ý, tạo ra chỉ để lại một thư mục rỗng
   // vĩnh viễn trong <dataDir>. Dựng rồi dọn một thư mục thăm dò thay vào đó.
   const probe = dests.DEST_DATA + "-probe-" + Date.now();

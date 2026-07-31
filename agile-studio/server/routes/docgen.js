@@ -681,8 +681,10 @@ export function registerDocRoutes(app, broadcast = () => {}) {
   });
 
   // Mở thư mục bằng file manager của OS — sau khi xuất, và từ từng dòng lịch sử xuất.
+  // Trả kèm `host`: thư mục mở trên máy chạy SERVER, không phải máy đang mở trình duyệt. Giao diện
+  // cần biết để nói đúng, thay vì để người dùng đoán (xem chú thích dài ở `revealDir`).
   app.post("/api/doc-dests/reveal", async (req, res) => {
-    try { await revealDir(String(req.body?.path || "")); res.json({ ok: true }); }
+    try { res.json(await revealDir(String(req.body?.path || ""))); }
     catch (e) { bad(res, 400, String(e.message)); }
   });
 

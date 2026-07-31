@@ -7,7 +7,7 @@
 // nằm trong repo git chưa được ignore, rồi `git add .` — repo phình vĩnh viễn vì .docx là binary.
 import { existsSync, mkdirSync, statSync } from "node:fs";
 import { join, dirname, resolve } from "node:path";
-import { homedir } from "node:os";
+import { homedir, hostname } from "node:os";
 import { fileURLToPath } from "node:url";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -89,14 +89,26 @@ export function dirInfo(dir) {
 
 // Mở thư mục bằng file manager của OS. Chỉ mở THƯ MỤC, không mở tệp: mở tệp .docx là chạy Word, và
 // đó không phải việc một nút "mở thư mục" được phép làm sau lưng người dùng.
+//
+// ⚠ HAI GIỚI HẠN KHÔNG SỬA ĐƯỢC TỪ ĐÂY — vì vậy giao diện luôn phải kèm nút chép đường dẫn:
+//
+// 1. **Cửa sổ mở ra nằm SAU trình duyệt.** Windows không cho một tiến trình đang chạy nền giành
+//    foreground; nó chỉ được phép nháy nút trên thanh tác vụ. Đã đo: bấm nút thì số cửa sổ Explorer
+//    tăng đúng 1 và trỏ đúng đường dẫn — nhưng người dùng đang nhìn trình duyệt nên đọc ra thành
+//    "bấm không có gì xảy ra", rồi bấm tiếp, và mở ra bốn cửa sổ chồng nhau.
+// 2. **Thư mục mở trên máy chạy SERVER, không phải máy đang mở trình duyệt.** Trùng nhau khi chạy
+//    localhost; mở Studio từ máy khác trong mạng thì cái nút này về nguyên tắc không giúp được gì.
+//
+// Nên hàm trả về cả `host` để giao diện nói đúng nó vừa mở ở đâu, thay vì im lặng.
 export async function revealDir(dir) {
   if (!dir || !dirInfo(dir).exists) throw new Error("Thư mục không tồn tại: " + dir);
+  const out = { ok: true, path: dir, host: hostname() };
   if (process.platform === "win32") {
     // explorer.exe trả exit code ≠ 0 kể cả khi mở thành công — đừng coi đó là lỗi.
     try { await pexecFile("explorer.exe", [dir], { windowsHide: true }); } catch { /* xem chú thích */ }
-    return true;
+    return out;
   }
-  if (process.platform === "darwin") { await pexecFile("open", [dir]); return true; }
+  if (process.platform === "darwin") { await pexecFile("open", [dir]); return out; }
   await pexecFile("xdg-open", [dir]);
-  return true;
+  return out;
 }

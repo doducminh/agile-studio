@@ -286,6 +286,14 @@ console.log("\n[nơi lưu khi xuất]");
   const ok1 = await get(`/api/doc-dests/check?path=${encodeURIComponent(repo.path)}`);
   ok("check: thư mục đã ignore → không cảnh báo", ok1.body.git.ignored === true);
   ok("check: thiếu path → 400", (await get("/api/doc-dests/check")).status === 400);
+
+  // Mở thư mục: chỉ kiểm nhánh LỖI. Nhánh thành công sẽ bật một cửa sổ Explorer lên màn hình người
+  // đang chạy test — bài test không được phép làm thế.
+  const rv = await post("/api/doc-dests/reveal", { path: "Z:/khong-he-ton-tai-" + Date.now() });
+  ok("mở thư mục không tồn tại → 400 kèm lý do đọc được",
+    rv.status === 400 && /không tồn tại/i.test(rv.body?.error || ""), JSON.stringify(rv.body));
+  ok("thiếu path → 400 chứ không phải mở nhầm thư mục nào đó",
+    (await post("/api/doc-dests/reveal", {})).status === 400);
 }
 
 srv.close();

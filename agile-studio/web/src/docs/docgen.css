@@ -380,6 +380,8 @@
 .dg-art .nm { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .dg-art .nm em { font-style:normal; display:block; font-size:10px; color:var(--dim);
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+/* Cặp nút "mở thư mục / chép đường dẫn" — luôn đi liền nhau và không bao giờ bị bóp lại. */
+.dg-pathbtns { display:inline-flex; gap:4px; flex:0 0 auto; }
 
 /* block editor */
 .dg-ed { display:flex; flex-direction:column; gap:9px; max-height:52vh; overflow:auto; padding-right:2px; }

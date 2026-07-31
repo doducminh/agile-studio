@@ -214,9 +214,38 @@ export default function DocProgress({ jobId, settings, onSettings, onBack, onJob
     flash("Đã bỏ đánh dấu — lần viết tới agent sẽ ghi đè mục này.");
   };
 
+  // Mở thư mục. Luôn nói ra kết quả — kể cả khi thành công.
+  //
+  // Vì sao phải nói: cửa sổ Explorer mở ra nằm SAU trình duyệt (Windows không cho tiến trình nền
+  // giành foreground) nên "thành công" trông y hệt "không có gì xảy ra". Đã đo: một lần bấm là một
+  // cửa sổ mới, đúng đường dẫn — người dùng chỉ không nhìn thấy nó. Im lặng ở đây khiến người ta
+  // bấm tiếp và mở ra bốn cửa sổ chồng nhau.
   const reveal = async (path) => {
     const r = await post("/api/doc-dests/reveal", { path });
-    if (r.error) setErr(r.error);
+    if (r.error) return setErr(`Không mở được thư mục: ${r.error}. Dùng nút 📋 để chép đường dẫn.`);
+    flash(r.host && r.host !== location.hostname && location.hostname !== "localhost"
+      ? `Đã mở thư mục trên máy chạy server (${r.host}) — không phải máy này. Dùng 📋 để chép đường dẫn.`
+      : "Đã mở thư mục — cửa sổ có thể nằm sau trình duyệt, xem trên thanh tác vụ.");
+  };
+
+  // Chép đường dẫn. `navigator.clipboard` chỉ có trong secure context: mở Studio bằng `localhost`
+  // thì được, nhưng bằng IP LAN (`http://192.168.x.x:5311`) thì KHÔNG — mà đó lại đúng là lúc nút
+  // "mở thư mục" vô dụng nhất. Nên phải có đường lùi bằng `execCommand`.
+  const copyPath = async (path) => {
+    try {
+      if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(path);
+      else {
+        const ta = document.createElement("textarea");
+        ta.value = path; ta.style.position = "fixed"; ta.style.opacity = "0";
+        document.body.appendChild(ta); ta.select();
+        const done = document.execCommand("copy");
+        document.body.removeChild(ta);
+        if (!done) throw new Error("trình duyệt từ chối");
+      }
+      flash("Đã chép đường dẫn: " + path);
+    } catch (e) {
+      setErr(`Không chép được (${e.message}). Đường dẫn: ${path}`);
+    }
   };
 
   const runExport = async (payload) => {
@@ -332,8 +361,7 @@ export default function DocProgress({ jobId, settings, onSettings, onBack, onJob
 
       {toast && (
         <div className="dg-toast">✅ {toast}
-          {revealDir && <button className="mini" style={{ marginLeft: 8 }}
-            onClick={() => reveal(revealDir)}>📂 Mở thư mục</button>}
+          {revealDir && <PathActions path={revealDir} onReveal={reveal} onCopy={copyPath} wide />}
         </div>
       )}
       {err && <div className="dg-err">{err}</div>}
@@ -371,7 +399,7 @@ export default function DocProgress({ jobId, settings, onSettings, onBack, onJob
         <RunConsole jobId={jobId} variant="tab" live={writing} />
       ) : tab === "export" ? (
         <ExportTab job={job} plan={plan} perDoc={perDoc} exports={exports} metrics={metrics}
-          python={python} onOpen={() => setDialog({ kind: "export" })} onReveal={reveal} />
+          python={python} onOpen={() => setDialog({ kind: "export" })} onReveal={reveal} onCopy={copyPath} />
       ) : view === "matrix" ? (
         <Matrix plan={plan} onPick={(id) => { setSelected(id); setView("detail"); }} />
       ) : (
@@ -569,7 +597,28 @@ function Matrix({ plan, onPick }) {
 }
 
 // MH 7 — what is in the Studio, and what has already been written out to disk.
-function ExportTab({ job, plan, perDoc, exports, metrics, python, onOpen, onReveal }) {
+// Hai nút đi liền nhau, không bao giờ tách: **mở** thư mục và **chép** đường dẫn.
+//
+// "Mở" là việc của server, và nó có hai giới hạn không sửa được từ đây (chú thích dài ở
+// `server/docgen/dests.js`): cửa sổ mở ra nằm sau trình duyệt, và nó mở trên máy chạy server chứ
+// không phải máy đang xem. Cả hai đều biến "thành công" thành "bấm chẳng thấy gì".
+//
+// "Chép" thì luôn đúng, ở mọi trường hợp, kể cả khi Studio đang mở từ một máy khác. Vì vậy nó là
+// đường lùi mặc định, không phải thứ chỉ hiện ra sau khi mở thất bại — lúc mở "thành công" mà người
+// dùng không thấy gì mới đúng là lúc cần nó nhất.
+function PathActions({ path, onReveal, onCopy, wide }) {
+  if (!path) return null;
+  return (
+    <span className="dg-pathbtns" style={wide ? { marginLeft: 8 } : undefined}>
+      <button className="mini" title={"Mở thư mục trên máy chạy server\n" + path}
+        onClick={() => onReveal?.(path)}>📂{wide ? " Mở thư mục" : ""}</button>
+      <button className="mini" title={"Chép đường dẫn\n" + path}
+        onClick={() => onCopy?.(path)}>📋{wide ? " Chép đường dẫn" : ""}</button>
+    </span>
+  );
+}
+
+function ExportTab({ job, plan, perDoc, exports, metrics, python, onOpen, onReveal, onCopy }) {
   const doneOf = new Map((perDoc || []).map((d) => [d.key, d]));
   const kb = (n) => (n >= 1048576 ? (n / 1048576).toFixed(1) + " MB" : Math.max(1, Math.round(n / 1024)) + " KB");
   const when = (t) => new Date(t).toLocaleString("vi-VN",
@@ -616,8 +665,7 @@ function ExportTab({ job, plan, perDoc, exports, metrics, python, onOpen, onReve
               <span className="pill">Word</span>
               {x.draft && <span className="pill run">bản nháp</span>}
               {/* Mở thư mục, không mở tệp: mở .docx là chạy Word, đó không phải việc của nút này. */}
-              <button className="mini" title={"Mở thư mục chứa tệp này\n" + x.destDir}
-                onClick={() => onReveal?.(x.destDir)}>📂</button>
+              <PathActions path={x.destDir} onReveal={onReveal} onCopy={onCopy} />
             </div>
           ))}
           {(x.skipped || []).map((s) => (
