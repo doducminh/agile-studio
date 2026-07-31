@@ -2,14 +2,19 @@ node_modules/
 web/dist/
 
 # secrets / local config
+# .env thật chứa DATABASE_URL (có mật khẩu) và token Discord — không bao giờ commit; mẫu chia sẻ
+# đặt tên `.env.example`. `.env.*` đã bao cả `.env.local`.
 .env
-.env.local
+.env.*
+!.env.example
 bot.config.json
 accounts.json
 
 # per-user generated data (keep .skill/ — it's the shareable skill pack)
 projects/
 requirements/
+# tài liệu .docx xuất ra khi đang phát triển — hàng MB mỗi tệp, không bao giờ commit
+exports/
 
 # os
 .DS_Store
