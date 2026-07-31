@@ -4,6 +4,11 @@ web/dist/
 # secrets / local config
 bot.config.json
 accounts.json
+# .env thật chứa DATABASE_URL (có mật khẩu) và token Discord. Trước đây nó KHÔNG nằm ở đây, nên chỉ
+# cần một lần `git add -A` là bị commit lên. Mẫu để chia sẻ thì đặt tên `.env.example`.
+.env
+.env.*
+!.env.example
 
 # per-user generated data (keep .skill/ — it's the shareable skill pack)
 projects/
