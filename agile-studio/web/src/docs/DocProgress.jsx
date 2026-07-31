@@ -4,6 +4,8 @@ import Dialog, { DialogButtons } from "./Dialog.jsx";
 import IrView from "./IrView.jsx";
 import SectionEditor from "./SectionEditor.jsx";
 import ExportDialog from "./ExportDialog.jsx";
+import RunConsole from "./RunConsole.jsx";
+import { EconomyChip, EconomyDialog, useEconomy } from "./EconomyChip.jsx";
 
 // MH 4 + MH 7 — watching the agent write, reading and fixing what it wrote, and getting a file out.
 //
@@ -67,13 +69,14 @@ export default function DocProgress({ jobId, settings, onSettings, onBack, onJob
   const [view, setView] = useState(() => localStorage.getItem(`dg:view:${jobId}`) || "detail");
   const [tab, setTab] = useState("progress");
   const [selected, setSelected] = useState(null);
-  const [feed, setFeed] = useState([]);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState("");
   const [toast, setToast] = useState("");
+  const [revealDir, setRevealDir] = useState("");   // thư mục vừa xuất, để toast có nút mở
   const [ask, setAsk] = useState(null);          // token dialog: "write" | "rewrite"
   const [dialog, setDialog] = useState(null);
   const timer = useRef(null);
+  const eco = useEconomy(settings, onSettings);
 
   const flash = (m) => { setToast(m); setTimeout(() => setToast(""), 5000); };
 
@@ -95,6 +98,13 @@ export default function DocProgress({ jobId, settings, onSettings, onBack, onJob
   useEffect(() => { load(); }, [load]);
   useEffect(() => { fetch("/api/doc-tools").then((r) => r.json()).then((d) => setPython(d.python)).catch(() => {}); }, []);
 
+  // Đổi chế độ tiết kiệm là đổi cả số mục lượt tới viết và cả dự báo token — nút phải nói lại con số
+  // mới ngay, không đợi tới lần tải màn sau.
+  const ecoKey = JSON.stringify(settings?.economy || null);
+  useEffect(() => {
+    fetch(`/api/doc-jobs/${jobId}/estimate?usage=1`).then((r) => r.json()).then(setEst).catch(() => {});
+  }, [jobId, ecoKey]);
+
   // Stale detection runs when the job is opened (Q21) — free, and the answer is stale itself if we
   // wait for the user to ask.
   useEffect(() => {
@@ -108,10 +118,9 @@ export default function DocProgress({ jobId, settings, onSettings, onBack, onJob
     ws.onmessage = (m) => {
       let e; try { e = JSON.parse(m.data); } catch { return; }
       if (e.jobId && e.jobId !== jobId) return;
-      if (e.type === "doc:activity") {
-        if (e.text) setFeed((f) => [e.text, ...f].slice(0, 9));
-        return;
-      }
+      // doc:activity và doc:log đều là dòng hoạt động — RunConsole tự lắng nghe doc:log, nên ở đây
+      // chỉ cần bỏ qua chúng, không reload cả màn cho từng dòng.
+      if (e.type === "doc:activity" || e.type === "doc:log") return;
       if (e.type === "doc:section" || e.type === "doc:job" || e.type === "doc:export") reload();
     };
     return () => { try { ws.close(); } catch { /* already closed */ } };
@@ -141,11 +150,14 @@ export default function DocProgress({ jobId, settings, onSettings, onBack, onJob
   };
 
   const startWrite = async (only) => {
-    setBusy("write"); setErr(""); setFeed([]);
+    setBusy("write"); setErr("");
     const r = await post(`/api/doc-jobs/${jobId}/write`, only ? { only } : {});
     setBusy("");
     if (r.error) return setErr(r.error);
-    flash(`Đang viết ${r.sections} mục · ${ENGINES.find((e) => e.id === r.engine)?.label}.`);
+    // Nói thẳng số mục bị hoãn: im lặng làm ít hơn số vừa hiện trên nút là cách nhanh nhất để
+    // người dùng tưởng tính năng hỏng.
+    flash(`Đang viết ${r.sections} mục · ${ENGINES.find((e) => e.id === r.engine)?.label}.`
+      + (r.deferred ? ` Chế độ tiết kiệm hoãn ${r.deferred} mục sang lượt sau — bấm Tiếp tục khi xong.` : ""));
     reload(); onJobChanged?.();
   };
 
@@ -202,6 +214,11 @@ export default function DocProgress({ jobId, settings, onSettings, onBack, onJob
     flash("Đã bỏ đánh dấu — lần viết tới agent sẽ ghi đè mục này.");
   };
 
+  const reveal = async (path) => {
+    const r = await post("/api/doc-dests/reveal", { path });
+    if (r.error) setErr(r.error);
+  };
+
   const runExport = async (payload) => {
     const r = await post(`/api/doc-jobs/${jobId}/export`, payload);
     if (r.error) return r.error;
@@ -209,11 +226,14 @@ export default function DocProgress({ jobId, settings, onSettings, onBack, onJob
     setExports(r.exports || []);
     const n = r.export.files.length;
     const skipped = r.export.skipped || [];
+    // `r.destDir` là thư mục THẬT đã ghi (đã cộng thư mục con), không phải cái người dùng chọn.
+    const where = r.destDir || payload.destDir;
     flash(n
-      ? `Đã xuất ${n} tệp vào ${payload.destDir}`
+      ? `Đã xuất ${n} tệp vào ${where}`
         + (skipped.length ? ` · bỏ qua ${skipped.length} tệp đang mở/bị khoá` : "")
       : `Không xuất được tệp nào — ${skipped.length} tệp đang mở trong Word hoặc bị khoá. `
         + "Đóng tệp rồi xuất lại; danh sách ở dưới.");
+    if (n) setRevealDir(where);
     setTab("export");
     reload();
     return null;
@@ -232,6 +252,9 @@ export default function DocProgress({ jobId, settings, onSettings, onBack, onJob
   const engine = job?.run?.engine || plan.engine || "per-doc";
   const pendingTokens = est?.pending?.tokens || 0;
   const staleTokens = est?.stale?.tokens || 0;
+  // Số mục lượt tới thật sự viết (server đã cắt theo giới hạn tiết kiệm) và số còn lại sau đó.
+  const nextN = est?.pending?.sections || 0;
+  const leftN = est?.pending?.left ?? nextN;
 
   return (
     <div className="dg-pane">
@@ -245,6 +268,10 @@ export default function DocProgress({ jobId, settings, onSettings, onBack, onJob
         <div className="dg-tabs">
           <button className={tab === "progress" ? "on" : ""} onClick={() => setTab("progress")}>Tiến độ</button>
           <button className={tab === "export" ? "on" : ""} onClick={() => setTab("export")}>Xuất bản</button>
+          <button className={tab === "console" ? "on" : ""} onClick={() => setTab("console")}
+            title="Xem trực tiếp Claude đang làm gì, và dò lại các bước dẫn đến lỗi">
+            Console{writing ? " ●" : ""}
+          </button>
         </div>
         <button className="primary" onClick={() => setDialog({ kind: "export" })}>⬇ Xuất…</button>
       </div>
@@ -264,23 +291,27 @@ export default function DocProgress({ jobId, settings, onSettings, onBack, onJob
             {busy === "stop" ? "Đang dừng…" : "⏸ Tạm dừng"}
           </button>
         ) : (
-          <button className="primary" disabled={busy === "write" || !est?.pending?.sections}
+          <button className="primary" disabled={busy === "write" || !nextN}
             onClick={() => (shouldAsk("write", pendingTokens, settings) ? setAsk("write") : startWrite(null))}>
             {busy === "write" ? "Đang khởi động…"
-              : metrics?.done ? `▶ Tiếp tục · ${est?.pending?.sections || 0} mục còn lại`
-              : `▶ Bắt đầu viết · ${est?.pending?.sections || 0} mục`}
+              : metrics?.done ? `▶ Tiếp tục · ${nextN} mục`
+              : `▶ Bắt đầu viết · ${nextN} mục`}
+            {leftN > nextN ? <span className="dg-dim"> (còn {leftN - nextN} đợi lượt sau)</span> : null}
             {" "}<TokenChip tokens={pendingTokens} threshold={settings?.tokenThreshold} />
           </button>
         )}
 
+        <EconomyChip economy={eco.economy} onChange={eco.patch} onConfigure={eco.openDialog} />
+
         <button className="ghost" disabled={busy === "stale"} onClick={refreshStale}
-          title="Đối chiếu nguồn của từng mục với HEAD hiện tại — không tiêu token">
-          ↻ Tìm mục đã cũ <span className="tok free">miễn phí</span>
+          title="Đối chiếu nguồn của từng mục với HEAD hiện tại bằng git diff">
+          ↻ Tìm mục đã cũ
         </button>
 
         {staleBulk.length > 0 && (
-          <button className="ghost" onClick={() => (shouldAsk("rewrite", staleTokens, settings)
-            ? setAsk("rewrite") : startWrite(staleBulk.map((s) => s.id)))}>
+          <button className="ghost"
+            onClick={() => (shouldAsk("rewrite", staleTokens, settings)
+              ? setAsk("rewrite") : startWrite(staleBulk.map((s) => s.id)))}>
             ✎ Viết lại {staleBulk.length} mục đã cũ{" "}
             <TokenChip tokens={staleTokens} threshold={settings?.tokenThreshold} />
           </button>
@@ -299,17 +330,48 @@ export default function DocProgress({ jobId, settings, onSettings, onBack, onJob
         )}
       </div>
 
-      {toast && <div className="dg-toast">✅ {toast}</div>}
+      {toast && (
+        <div className="dg-toast">✅ {toast}
+          {revealDir && <button className="mini" style={{ marginLeft: 8 }}
+            onClick={() => reveal(revealDir)}>📂 Mở thư mục</button>}
+        </div>
+      )}
       {err && <div className="dg-err">{err}</div>}
-      {job?.status === "error" && job?.error?.message && <div className="dg-err">{job.error.message}</div>}
+      {/* Một job bị ngắt cần trả lời được "vì sao", không chỉ "đã ngắt". `why` giải thích rằng CLI
+          bị kill nên không có mã thoát; `trace` là mấy dòng cuối agent kịp phát — thứ trước đây
+          mất hẳn cùng tiến trình. */}
+      {job?.status === "error" && job?.error?.message && (
+        <div className="dg-err">
+          <div>{job.error.message}</div>
+          {job.error.why && <div className="dg-errwhy">{job.error.why}</div>}
+          {job.error.lastActivity &&
+            <div className="dg-errwhy">Dòng cuối agent kịp phát: <b>{job.error.lastActivity}</b></div>}
+          {job.error.trace?.length > 0 && (
+            <details className="dg-errtrace">
+              <summary>{job.error.trace.length} dòng cuối trước khi ngắt</summary>
+              {job.error.trace.map((e, i) => (
+                <div key={i}><span className="dg-dim">{e.kind}</span>{e.session ? ` · ${e.session}` : ""} — {e.text}</div>
+              ))}
+            </details>
+          )}
+          <div className="dg-row" style={{ marginTop: 6 }}>
+            <button className="mini" onClick={() => setTab("console")}>→ Mở Console xem đầy đủ</button>
+            <button className="mini" onClick={() => window.open(`/api/doc-jobs/${jobId}/log/download`, "_blank")}>
+              ⬇ Tải log
+            </button>
+          </div>
+        </div>
+      )}
       {python && !python.ok && (
         <div className="dg-note warn">⚠ {python.hint} Phần viết nội dung, sửa tay và theo dõi tiến độ
           vẫn chạy bình thường; chỉ nút xuất bị khoá.</div>
       )}
 
-      {tab === "export" ? (
+      {tab === "console" ? (
+        <RunConsole jobId={jobId} variant="tab" live={writing} />
+      ) : tab === "export" ? (
         <ExportTab job={job} plan={plan} perDoc={perDoc} exports={exports} metrics={metrics}
-          python={python} onOpen={() => setDialog({ kind: "export" })} />
+          python={python} onOpen={() => setDialog({ kind: "export" })} onReveal={reveal} />
       ) : view === "matrix" ? (
         <Matrix plan={plan} onPick={(id) => { setSelected(id); setView("detail"); }} />
       ) : (
@@ -361,7 +423,7 @@ export default function DocProgress({ jobId, settings, onSettings, onBack, onJob
                       title="Cho agent quyền viết lại mục này">↺ Bỏ đánh dấu đã sửa tay</button>
                   ) : null}
                   <button className="mini" onClick={() => setDialog({ kind: "edit" })}
-                    title="Sửa tay nội dung mục này — không tiêu token">✎ Sửa</button>
+                    title="Sửa tay nội dung mục này">✎ Sửa</button>
                   {!current.edited && (
                     <button className="mini" title="Chỉ viết lại đúng mục này"
                       onClick={() => startWrite([current.id])}>▶ Viết lại mục này</button>
@@ -374,11 +436,10 @@ export default function DocProgress({ jobId, settings, onSettings, onBack, onJob
               {current?.status === "error" && current?.error &&
                 <div className="dg-err">{current.error}</div>}
             </div>
-            <div className="dg-feed">
-              <span className="dg-label">Hoạt động</span>
-              {feed.length ? feed.map((f, i) => <div key={i} className={i ? "" : "now"}>{f}</div>)
-                : <div className="dg-dim">{job?.write?.activity || "chưa có hoạt động nào trong phiên này"}</div>}
-            </div>
+            {/* Khung Hoạt động cũ là 9 dòng rút gọn giữ trong RAM trình duyệt. Giờ nó là console
+                thu nhỏ: cùng nguồn dữ liệu với tab Console, mở được từng dòng, phình ra toàn màn
+                hình bằng ⛶, và tải log về được ngay tại đây. */}
+            <RunConsole jobId={jobId} variant="inline" live={writing} />
           </section>
 
           <aside className="dg-side">
@@ -414,6 +475,9 @@ export default function DocProgress({ jobId, settings, onSettings, onBack, onJob
           </aside>
         </div>
       )}
+
+      <EconomyDialog open={eco.dialogOpen} economy={eco.economy}
+        onCancel={eco.closeDialog} onSave={eco.save} />
 
       <SectionEditor open={dialog?.kind === "edit"} section={current} ir={currentIr}
         onCancel={() => setDialog(null)} onSave={saveEdit} />
@@ -505,7 +569,7 @@ function Matrix({ plan, onPick }) {
 }
 
 // MH 7 — what is in the Studio, and what has already been written out to disk.
-function ExportTab({ job, plan, perDoc, exports, metrics, python, onOpen }) {
+function ExportTab({ job, plan, perDoc, exports, metrics, python, onOpen, onReveal }) {
   const doneOf = new Map((perDoc || []).map((d) => [d.key, d]));
   const kb = (n) => (n >= 1048576 ? (n / 1048576).toFixed(1) + " MB" : Math.max(1, Math.round(n / 1024)) + " KB");
   const when = (t) => new Date(t).toLocaleString("vi-VN",
@@ -536,7 +600,6 @@ function ExportTab({ job, plan, perDoc, exports, metrics, python, onOpen }) {
 
       <div className="dg-row" style={{ marginTop: 4 }}>
         <button className="primary" onClick={onOpen} disabled={python && !python.ok}>⬇ Xuất…</button>
-        <span className="tok free">miễn phí · không tiêu token</span>
         {python?.ok && <span className="dg-sub">Python {python.python} · python-docx {python.pythonDocx}</span>}
       </div>
 
@@ -552,6 +615,9 @@ function ExportTab({ job, plan, perDoc, exports, metrics, python, onOpen }) {
                 <em title={f.path}>{x.destDir} · {kb(f.bytes)} · {when(x.at)}</em></div>
               <span className="pill">Word</span>
               {x.draft && <span className="pill run">bản nháp</span>}
+              {/* Mở thư mục, không mở tệp: mở .docx là chạy Word, đó không phải việc của nút này. */}
+              <button className="mini" title={"Mở thư mục chứa tệp này\n" + x.destDir}
+                onClick={() => onReveal?.(x.destDir)}>📂</button>
             </div>
           ))}
           {(x.skipped || []).map((s) => (
@@ -561,6 +627,7 @@ function ExportTab({ job, plan, perDoc, exports, metrics, python, onOpen }) {
               <span className="pill err">bỏ qua</span>
             </div>
           ))}
+          {(x.warnings || []).map((w, i) => <div className="dg-note warn" key={i}>⚠ {w}</div>)}
         </React.Fragment>
       ))}
     </div>

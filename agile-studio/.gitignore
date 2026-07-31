@@ -8,6 +8,8 @@ accounts.json
 # per-user generated data (keep .skill/ — it's the shareable skill pack)
 projects/
 requirements/
+# tài liệu .docx xuất ra khi đang phát triển — hàng MB mỗi tệp, không bao giờ commit
+exports/
 
 # os
 .DS_Store

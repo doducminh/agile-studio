@@ -162,12 +162,25 @@ export default function App() {
         <div className="brand">Agile&nbsp;Studio</div>
         <button className="add-proj" onClick={() => setAddProjOpen(true)}>+ Project</button>
         <div className="proj-list">
-          {projects.map((p) => (
-            <button key={p.id} className={"proj" + (active?.id === p.id ? " on" : "")}
-              onClick={() => { setActive(p); setSelectedId(null); }}>
-              <span className="proj-name">{p.name}</span>
-              <span className="proj-path">{p.repo_path}</span>
-            </button>
+          {/* Server đã đẩy project mẫu xuống cuối; ở đây chỉ cần chèn đường phân cách trước cái đầu
+              tiên trong nhóm đó, để nó không bị nhìn như một project thật của người dùng. */}
+          {projects.map((p, i) => (
+            <React.Fragment key={p.id}>
+              {p.demo && !projects[i - 1]?.demo && (
+                <div className="proj-sep" title="Project đi kèm Studio, không phải của bạn">
+                  <span>project mẫu</span>
+                </div>
+              )}
+              <button className={"proj" + (active?.id === p.id ? " on" : "") + (p.demo ? " demo" : "")}
+                title={p.demo ? p.demoHint : p.repo_path}
+                onClick={() => { setActive(p); setSelectedId(null); }}>
+                <span className="proj-name">
+                  {p.name}
+                  {p.demo && <em className="proj-badge">{p.demoBadge}</em>}
+                </span>
+                <span className="proj-path">{p.repo_path}</span>
+              </button>
+            </React.Fragment>
           ))}
           {!projects.length && <p className="empty">Chưa có project. Bấm + Project để thêm.</p>}
         </div>
@@ -194,7 +207,10 @@ export default function App() {
                 </>
               )}
               <button className="gear" title="Cài đặt" onClick={() => setSettingsOpen(true)}>⚙</button>
-              <div className="proj-title">{active.name}</div>
+              <div className="proj-title" title={active.demo ? active.demoHint : active.repo_path}>
+                {active.name}
+                {active.demo && <em className="proj-badge">{active.demoBadge}</em>}
+              </div>
             </header>
 
             {tab === "flow" ? (

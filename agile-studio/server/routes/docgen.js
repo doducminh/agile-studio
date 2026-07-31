@@ -1,6 +1,7 @@
 // Every docgen HTTP route lives here. Registered from index.js with two lines, so the rest of
 // the server is untouched by this feature.
 import { existsSync } from "node:fs";
+import { join } from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { store } from "../store.js";
@@ -19,6 +20,10 @@ import { createWriteRun, pendingSections, ENGINES, headCommit } from "../docgen/
 import { normalizeSection, sectionMetrics, jobMetrics } from "../docgen/ir.js";
 import { detectStale, applyStale } from "../docgen/stale.js";
 import { detectPython, forgetPython, renderDocx } from "../docgen/exporter.js";
+import { ensureDemoProject, DEMO_NAME } from "../docgen/demo.js";
+import { economyOf, capTargets, priceFactor } from "../docgen/economy.js";
+import { destCandidates, gitIgnoreStatus, ensureDir, dirInfo, revealDir } from "../docgen/dests.js";
+import * as runlog from "../docgen/runlog.js";
 
 const pexecFile = promisify(execFile);
 
@@ -73,23 +78,73 @@ function standardFor(job) {
 export function registerDocRoutes(app, broadcast = () => {}) {
   const emit = (job, extra = {}) => broadcast({ type: "doc:job", jobId: job.id, job, ...extra });
 
-  // A survey that was interrupted by a restart is not "still running" — mark it so the card
-  // offers "Tiếp tục" instead of a spinner that never ends (test case 10).
+  // Project mẫu `stale-demo`: dựng lúc boot nếu chưa có, và seed dữ liệu mẫu nếu nó chưa có bộ
+  // tài liệu nào. Chạy ở đây (không phải index.js) để feature docgen tự lo phần khởi tạo của mình.
+  //
+  // Không đồng bộ vì seed.js được nạp động — nhưng cũng không ai phải chờ: các route dưới đã đăng
+  // ký xong trước khi phần này chạy, và lần gọi API đầu tiên của UI luôn tới sau đó.
+  (async () => {
+    try {
+      const boot = ensureDemoProject(store, docgenStore);
+      if (boot.files?.created) console.log(`[docgen] đã dựng repo mẫu tại ${boot.files.path}`);
+      if (boot.action === "created") console.log(`[docgen] đã tạo project mẫu “${DEMO_NAME}”`);
+      if (boot.action === "repathed")
+        console.log(`[docgen] project “${DEMO_NAME}” trỏ vào thư mục không còn tồn tại `
+          + `(${boot.from}) — đã trỏ lại về ${boot.project?.repo_path}`);
+      if (boot.seeded === "pending" && boot.project) {
+        const { seedDocgen } = await import("../docgen/seed.js");
+        const out = seedDocgen(boot.project);
+        console.log(`[docgen] đã seed ${out.jobs.length} bộ tài liệu mẫu vào project mẫu`);
+        broadcast({ type: "doc:job", jobId: null, seeded: true });
+      }
+    } catch (e) {
+      // Dựng project mẫu thất bại không được làm server không lên: mọi thứ khác vẫn chạy được.
+      console.error("[docgen] không dựng được project mẫu: " + e.message);
+    }
+  })();
+
+  // A survey or a write run that was interrupted by a restart is not "still running" — mark it so
+  // the card offers "Tiếp tục" instead of a spinner that never ends (test cases 10 and 11).
+  //
+  // "Server đã restart" answers *what* happened, never *why*. The why is in run.log, which survived
+  // the restart precisely for this: the last few real events go into `error.trace` so the UI can
+  // show them without the user having to find the file. That gap is the ca-11 bug.
   for (const job of docgenStore.listJobs()) {
-    if (job.status === "surveying")
-      docgenStore.patchJob(job.id, { status: "error",
-        error: { kind: "interrupted", message: "Server khởi động lại khi đang khảo sát — bấm Tiếp tục để chạy lại." } });
-    // Same for a write run (test case 11). Sections that made it to the store are kept; the ones
-    // that were mid-flight go back to pending so "Tiếp tục" picks up exactly those.
+    const interrupted = job.status === "surveying" ? "khảo sát" : job.status === "writing" ? "viết" : null;
+    if (!interrupted) continue;
     if (job.status === "writing") {
+      // Sections that made it to the store are kept; the ones mid-flight go back to pending so
+      // "Tiếp tục" picks up exactly those.
       const plan = docgenStore.getPlan(job.id);
       for (const d of plan?.docs || [])
         for (const s of d.sections || []) if (s.status === "writing")
           docgenStore.patchPlanSection(job.id, s.id, { status: "pending" });
-      docgenStore.patchJob(job.id, { status: "error",
-        error: { kind: "interrupted",
-          message: "Server khởi động lại khi đang viết — các mục đã viết vẫn còn, bấm Tiếp tục để viết nốt." } });
     }
+    let trace = [];
+    try { trace = runlog.lastMeaningful(job.id, 8); } catch { /* chưa có log cho job này */ }
+    const stage = job.status === "writing" ? "write" : "survey";
+    const last = trace.at(-1);
+    try {
+      runlog.log(job.id, { stage, kind: "run-error",
+        text: `■ server restart khi đang ${interrupted} — lượt này bị cắt`,
+        detail: [`Tiến trình server kết thúc trong lúc job đang ở trạng thái "${job.status}".`,
+          `Dòng cuối agent kịp phát: ${last ? `${last.kind} — ${last.text}` : "(không có, phiên chưa phát event nào)"}`,
+          "",
+          "Đây KHÔNG phải lỗi do Claude trả về: CLI bị kill cùng tiến trình cha nên không có mã thoát hay stderr nào.",
+          "Muốn biết agent đang làm gì thì đọc các dòng ngay trên dòng này."]
+          .join("\n") });
+    } catch { /* ghi log lỗi thì cũng không được chặn việc đánh dấu job */ }
+    docgenStore.patchJob(job.id, { status: "error",
+      error: { kind: "interrupted",
+        message: job.status === "writing"
+          ? "Server khởi động lại khi đang viết — các mục đã viết vẫn còn, bấm Tiếp tục để viết nốt."
+          : "Server khởi động lại khi đang khảo sát — bấm Tiếp tục để chạy lại.",
+        // Vì sao không có lý do từ Claude: CLI chết cùng tiến trình cha, không kịp trả mã thoát.
+        why: "Tiến trình server dừng giữa lượt chạy nên Claude CLI bị kill theo, không có mã thoát "
+          + "hay stderr để báo. Mấy dòng cuối agent kịp phát nằm ở tab Console (hoặc tải log về).",
+        lastActivity: last ? `${last.text}` : null,
+        trace: trace.map((e) => ({ t: e.t, kind: e.kind, session: e.session, text: e.text })),
+      } });
   }
 
   // ---- standards & presets (studio-wide) ----
@@ -116,7 +171,11 @@ export function registerDocRoutes(app, broadcast = () => {}) {
   // hơn N token", and any feature that spends tokens should gate itself with the same number.
   // It lives in docgen.json only because D1 must not touch store.js; Cài đặt → Chung (D3) moves
   // the control there, reading the same endpoint.
-  app.get("/api/agent-settings", (req, res) => res.json(docgenStore.getSettings()));
+  // `notes` (danh sách cái gì đang bị siết) đi kèm luôn, để client không phải tự suy lại từ các cờ
+  // thô — suy hai nơi là hai nơi phải sửa khi thêm một nút tiết kiệm.
+  const withEconomyNotes = (s) => ({ ...s, economy: { ...s.economy, notes: economyOf(s).notes } });
+
+  app.get("/api/agent-settings", (req, res) => res.json(withEconomyNotes(docgenStore.getSettings())));
   app.put("/api/agent-settings", (req, res) => {
     const patch = {};
     if (req.body.tokenThreshold !== undefined)
@@ -127,7 +186,9 @@ export function registerDocRoutes(app, broadcast = () => {}) {
     // Global Word template: the fallback used by any document set that does not pick its own.
     if (typeof req.body.defaultTemplatePath === "string")
       patch.defaultTemplatePath = req.body.defaultTemplatePath.trim();
-    res.json(docgenStore.setSettings(patch));
+    // Economy mode. The store normalizes it, so a partial patch ({ on: false }) keeps the rest.
+    if (req.body.economy && typeof req.body.economy === "object") patch.economy = req.body.economy;
+    res.json(withEconomyNotes(docgenStore.setSettings(patch)));
   });
 
   // Native "choose a .docx" dialog. The app already has a folder picker; a document set needs a
@@ -176,7 +237,8 @@ export function registerDocRoutes(app, broadcast = () => {}) {
     const jobs = docgenStore.listJobs(p.id).map((j) => withPlanSummary(j));
     // Report a missing CLI here rather than letting the user find out two minutes into a survey.
     const cli = ensureClaudeOnPath();
-    res.json({ jobs, storage: docgenStore.status(), cli: { ok: cli.ok, hint: cli.hint || null } });
+    res.json({ jobs, storage: docgenStore.status(), cli: { ok: cli.ok, hint: cli.hint || null },
+      economy: economyOf(docgenStore.getSettings()) });
   });
 
   app.post("/api/projects/:id/doc-jobs", (req, res) => {
@@ -276,6 +338,10 @@ export function registerDocRoutes(app, broadcast = () => {}) {
     if (!std) return bad(res, 400, "Chuẩn không còn tồn tại");
     const project = store.getProject(job.projectId);
     if (!project || !existsSync(project.repo_path)) return bad(res, 400, "Không đọc được thư mục repo của project");
+    const eco = economyOf(docgenStore.getSettings());
+    if (eco.blockSurvey)
+      return bad(res, 403, "Chế độ tiết kiệm đang chặn khảo sát (khoản đắt thứ hai sau viết). "
+        + "Áp một preset để có dàn ý miễn phí, hoặc tắt “chặn khảo sát” trong cấu hình tiết kiệm.");
     const account = accountFor();
     if (!account) return bad(res, 400, "Chưa có account nào đang bật — thêm account rồi thử lại.");
 
@@ -363,6 +429,10 @@ export function registerDocRoutes(app, broadcast = () => {}) {
     if (!text) return bad(res, 400, "Cần mô tả điều muốn sửa");
     const std = standardFor(job);
     const project = store.getProject(job.projectId);
+    const eco = economyOf(docgenStore.getSettings());
+    if (eco.blockSurvey)
+      return bad(res, 403, "Chế độ tiết kiệm đang chặn khảo sát và đề xuất lại dàn ý. "
+        + "Sửa dàn ý bằng tay (miễn phí), hoặc tắt “chặn khảo sát” trong cấu hình tiết kiệm.");
     const account = accountFor();
     if (!account) return bad(res, 400, "Chưa có account nào đang bật");
     startSurvey({ job, std, project, account, revise: text });
@@ -424,6 +494,10 @@ export function registerDocRoutes(app, broadcast = () => {}) {
       return bad(res, 400, only
         ? "Những mục đã chọn không cần viết lại (đã xong, hoặc đang được đánh dấu sửa tay)."
         : "Không còn mục nào cần viết. Muốn viết lại thì chọn mục cụ thể hoặc bấm ↻ để tìm mục đã cũ.");
+    // The run applies the cap itself (claim() is the one place that decides what a pass owns); this
+    // is only so the response tells the truth about how many sections this call will write.
+    const eco = economyOf(docgenStore.getSettings());
+    const capped = capTargets(targets, eco);
 
     const run = createWriteRun({
       job, std, plan, repoPath: project.repo_path,
@@ -443,8 +517,60 @@ export function registerDocRoutes(app, broadcast = () => {}) {
       .finally(() => { writes.delete(job.id); });
 
     docgenStore.patchJob(job.id, { run: { engine } });
-    res.json({ ok: true, engine, sections: targets.length,
+    res.json({ ok: true, engine, sections: capped.targets.length, deferred: capped.deferred,
+      economy: eco.on ? eco.notes : null,
       job: withPlanSummary(docgenStore.getJob(job.id)) });
+  });
+
+  // ---- run log: what the agent actually did -----------------------------------------------
+  // The console reads this, and it is the only answer to "the job failed and there is nothing to
+  // look at". Free: reading a file.
+  //
+  // `after` makes it a cheap poll as well as a WS consumer — the console asks once on open and then
+  // lives off doc:log events, but a reconnect must not re-render 2000 rows it already has.
+  app.get("/api/doc-jobs/:jid/log", (req, res) => {
+    const job = docgenStore.getJob(req.params.jid);
+    if (!job) return bad(res, 404, "Không thấy bộ tài liệu");
+    const out = runlog.readLog(job.id, {
+      after: Math.max(0, Number(req.query.after) || 0),
+      limit: Math.min(2000, Math.max(1, Number(req.query.limit) || 400)),
+      session: req.query.session ? String(req.query.session) : null,
+      kind: req.query.kind ? String(req.query.kind) : null,
+      run: req.query.run ? String(req.query.run) : null,
+    });
+    const st = runlog.logState(job.id, ranInfoOf(job));
+    // `note` chỉ có khi có VẤN ĐỀ. "never" (chưa chạy lượt nào) là trạng thái bình thường — gắn một
+    // dòng cảnh báo vào đó là dạy người dùng bỏ qua cảnh báo.
+    const problem = st.state !== "ok" && st.state !== "never";
+    res.json({ ...out, ...st, note: problem ? logStateMessage(st) : null,
+      live: writes.has(job.id) || running.has(job.id) });
+  });
+
+  // Plain-text download. Attachment, not JSON: the point is to open it in an editor or paste it
+  // into a bug report.
+  app.get("/api/doc-jobs/:jid/log/download", (req, res) => {
+    const job = docgenStore.getJob(req.params.jid);
+    if (!job) return bad(res, 404, "Không thấy bộ tài liệu");
+    // Gửi một tệp rỗng khi log không có là tệ hơn báo lỗi: người dùng mở ra thấy trắng và không
+    // biết vì sao. 404 kèm câu giải thích, UI đã hiện cùng câu đó nên hai nơi không lệch nhau.
+    const st = runlog.logState(job.id, ranInfoOf(job));
+    if (st.state !== "ok") return res.status(404).json({ ...st, error: logStateMessage(st) });
+    const text = runlog.renderLogText(job.id, {
+      session: req.query.session ? String(req.query.session) : null,
+      run: req.query.run ? String(req.query.run) : null,
+    });
+    const safe = String(job.name || job.id).replace(/[^\p{L}\p{N}._-]+/gu, "-").slice(0, 60);
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="${safe}-${job.id}.log"`);
+    res.send(text);
+  });
+
+  app.delete("/api/doc-jobs/:jid/log", (req, res) => {
+    if (!docgenStore.getJob(req.params.jid)) return bad(res, 404, "Không thấy bộ tài liệu");
+    if (writes.has(req.params.jid) || running.has(req.params.jid))
+      return bad(res, 409, "Đang có phiên chạy — dừng trước khi xoá log.");
+    runlog.clearLog(req.params.jid);
+    res.json({ ok: true });
   });
 
   // Everything the progress screen needs in one call: the outline with its per-section state, the
@@ -460,6 +586,7 @@ export function registerDocRoutes(app, broadcast = () => {}) {
       exports: docgenStore.listExports(job.id),
       writing: writes.has(job.id),
       standard: publicStandard(standardFor(job)),
+      economy: economyOf(docgenStore.getSettings()),
     });
   });
 
@@ -533,6 +660,32 @@ export function registerDocRoutes(app, broadcast = () => {}) {
     res.json({ python: await detectPython({ force: req.query.recheck === "1" }) });
   });
 
+  // Nơi lưu sẵn cho hộp Xuất: ba nút thay cho việc lội hộp thoại native mỗi lần. Kèm trạng thái
+  // gitignore của từng chỗ, vì đó là thứ quyết định có cảnh báo hay không.
+  app.get("/api/doc-dests", async (req, res) => {
+    const list = destCandidates();
+    const out = [];
+    for (const d of list) {
+      const git = await gitIgnoreStatus(d.path).catch(() => ({ inRepo: false, ignored: false }));
+      out.push({ ...d, ...dirInfo(d.path), git });
+    }
+    res.json({ dests: out });
+  });
+
+  // Kiểm một thư mục người dùng tự chọn/tự gõ. Cùng một hàm với ở trên, nên cảnh báo không thể lệch.
+  app.get("/api/doc-dests/check", async (req, res) => {
+    const dir = String(req.query.path || "").trim();
+    if (!dir) return bad(res, 400, "Thiếu đường dẫn");
+    res.json({ path: dir, ...dirInfo(dir),
+      git: await gitIgnoreStatus(dir).catch(() => ({ inRepo: false, ignored: false })) });
+  });
+
+  // Mở thư mục bằng file manager của OS — sau khi xuất, và từ từng dòng lịch sử xuất.
+  app.post("/api/doc-dests/reveal", async (req, res) => {
+    try { await revealDir(String(req.body?.path || "")); res.json({ ok: true }); }
+    catch (e) { bad(res, 400, String(e.message)); }
+  });
+
   app.get("/api/doc-jobs/:jid/exports", (req, res) => {
     if (!docgenStore.getJob(req.params.jid)) return bad(res, 404, "Không thấy bộ tài liệu");
     res.json({ exports: docgenStore.listExports(req.params.jid) });
@@ -549,13 +702,24 @@ export function registerDocRoutes(app, broadcast = () => {}) {
     const unsupported = formats.filter((f) => f !== "docx");
     if (unsupported.length)
       return bad(res, 400, `Bước này chỉ xuất được .docx. Định dạng ${unsupported.join(", ")} thuộc feature xuất PDF.`);
-    const destDir = String(req.body?.destDir || "").trim();
-    if (!destDir) return bad(res, 400, "Chưa chọn nơi lưu");
+    const baseDir = String(req.body?.destDir || "").trim();
+    if (!baseDir) return bad(res, 400, "Chưa chọn nơi lưu");
     const keys = Array.isArray(req.body?.docs) && req.body.docs.length ? req.body.docs.map(String) : null;
     const draft = req.body?.draft !== false;
+    // Hai tuỳ chọn mặc định BẬT, tắt được từ hộp thoại:
+    //   subfolder — 6 tệp của một bộ đổ chung một thư mục với bộ khác thì lần thứ hai là lẫn hết
+    //   dateStamp — không ghi đè bản cũ, giữ được lịch sử để so
+    const subfolder = req.body?.subfolder !== false;
+    const dateStamp = req.body?.dateStamp !== false;
+
+    const destDir = subfolder
+      ? join(baseDir, safeSeg(job.projectName || "project"), safeSeg(job.name || job.id))
+      : baseDir;
+    try { ensureDir(destDir); }
+    catch (e) { return bad(res, 400, `Không tạo được thư mục lưu: ${e.message}`); }
 
     const ir = docgenStore.getIr(job.id);
-    const specs = exportSpecs({ job, std: standardFor(job), plan, ir, keys, draft });
+    const specs = exportSpecs({ job, std: standardFor(job), plan, ir, keys, draft, dateStamp });
     if (!specs.length) return bad(res, 400, "Không có tài liệu nào để xuất");
 
     const out = await renderDocx({ jobId: job.id, docs: specs, destDir, draft });
@@ -565,13 +729,23 @@ export function registerDocRoutes(app, broadcast = () => {}) {
     // (RULESET §6 #3). Only a renderer that produced nothing at all is a real failure.
     if (!out.files?.length && !out.skipped?.length) return bad(res, 400, out.error || "Xuất thất bại");
 
+    // Cảnh báo nếu vừa ghi .docx vào một repo git chưa ignore — sau khi ghi, vì lúc đó mới biết
+    // chắc thư mục nào thật sự được dùng. Không chặn: người dùng có thể cố ý muốn commit.
+    const git = await gitIgnoreStatus(destDir).catch(() => null);
+    const warnings = [...(out.warnings || [])];
+    if (git?.inRepo && !git.ignored)
+      warnings.push(`Thư mục này nằm trong repo git (${git.repoRoot}) và CHƯA được .gitignore. `
+        + "Tệp .docx là binary hàng MB — commit vào là repo phình vĩnh viễn. Thêm đường dẫn này vào "
+        + ".gitignore, hoặc xuất sang chỗ khác.");
+
     const rec = docgenStore.addExport(job.id, {
       format: "docx", destDir, draft, python: out.python || null,
       files: (out.files || []).map((f) => ({ path: f.path, bytes: f.bytes, title: f.title, counts: f.counts })),
-      skipped: out.skipped || [], warnings: out.warnings || [], counts: out.counts || {},
+      skipped: out.skipped || [], warnings, counts: out.counts || {},
+      git: git ? { inRepo: git.inRepo, ignored: git.ignored, repoRoot: git.repoRoot } : null,
     });
     broadcast({ type: "doc:export", jobId: job.id, export: rec });
-    res.json({ export: rec, exports: docgenStore.listExports(job.id) });
+    res.json({ export: rec, exports: docgenStore.listExports(job.id), destDir });
   });
 
   // Roll the derived numbers back onto the job so the board card is right without opening the job.
@@ -605,21 +779,33 @@ export function registerDocRoutes(app, broadcast = () => {}) {
     // What the write buttons actually cost, which is not the same as "the whole plan": a resumed
     // run pays only for what is left, and "viết lại N mục đã cũ" only for the stale ones.
     const depth = job.style?.depth;
-    const priceOf = (list) => list.reduce((n, t) => n + estimateSection(t.section, depth), 0);
+    // Economy mode changes what a run costs, so every number the buttons show has to go through the
+    // same factor — otherwise the token dialog warns about a price nobody is going to pay.
+    const eco = economyOf(settings);
+    const f = priceFactor(eco);
+    const priceOf = (list) => Math.round(list.reduce((n, t) => n + estimateSection(t.section, depth), 0) * f);
     const rest = plan ? pendingSections(job.id, plan, { only: null }) : [];
     const staleAll = (plan?.docs || []).flatMap((d) => (d.sections || [])
       .filter((s) => s.status === "stale").map((s) => ({ doc: d, section: s })));
     const staleBulk = staleAll.filter((t) => !t.section.edited);
+    // What the NEXT click costs, which under a section cap is not what "everything left" costs.
+    const nextRun = capTargets(rest, eco);
+    const nextStale = capTargets(staleBulk, eco);
 
     res.json({
-      survey: estimateSurvey(sectionCount),
-      revise: estimateRevise(sectionCount),
-      write: write.tokens, sections: write.sections,
-      pending: { sections: rest.length, tokens: priceOf(rest) },
-      stale: { sections: staleBulk.length, tokens: priceOf(staleBulk),
+      survey: eco.blockSurvey ? 0 : estimateSurvey(sectionCount),
+      revise: eco.blockSurvey ? 0 : estimateRevise(sectionCount),
+      write: Math.round(write.tokens * f), sections: write.sections,
+      // `pending` = số mục lượt tới thật sự viết (đã cắt theo cap) — đó là thứ nút hiển thị.
+      // `left` = tổng còn thiếu, để nói “còn N mục nữa sau lượt này”.
+      pending: { sections: nextRun.targets.length, tokens: priceOf(nextRun.targets),
+        left: rest.length, deferred: nextRun.deferred },
+      stale: { sections: nextStale.targets.length, tokens: priceOf(nextStale.targets),
+        left: staleBulk.length, deferred: nextStale.deferred,
         held: staleAll.length - staleBulk.length },
-      windows: windowsOf(write.tokens, settings.tokensPer5h),
+      windows: windowsOf(Math.round(write.tokens * f), settings.tokensPer5h),
       tokensPer5h: settings.tokensPer5h, threshold: settings.tokenThreshold,
+      economy: eco,
       account: account ? { id: account.id, label: account.label } : null,
       accounts: enabledAccounts().length,
       usage,
@@ -642,10 +828,26 @@ export function registerDocRoutes(app, broadcast = () => {}) {
   // ---- the surveying session itself ----
   function startSurvey({ job, std, project, account, revise }) {
     const settings = store.getSettings();
+    const eco = economyOf(docgenStore.getSettings());
     const started = Date.now();
+    const run = runlog.beginRun(job.id, { stage: "survey",
+      note: revise ? "▶ bắt đầu đề xuất lại dàn ý" : "▶ bắt đầu khảo sát" });
+    const runId = run.runId;
+    // Một dòng log + một event WS trong cùng một chỗ, giống WriteRun.say().
+    const say = (entry) => {
+      const row = runlog.log(job.id, { stage: "survey", run: runId, session: "khảo sát", ...entry });
+      broadcast({ type: "doc:log", jobId: job.id, entry: row });
+      return row;
+    };
+    say({ kind: "info", text: "⚙ cấu hình lượt khảo sát",
+      detail: [`repo:      ${project.repo_path}`, `account:   ${account.id}`,
+        `model:     ${eco.model || settings.model || "(mặc định theo account)"}`,
+        `tiết kiệm: ${eco.on ? eco.notes.join(" · ") : "tắt"}`,
+        `chế độ:    ${revise ? "đề xuất lại dàn ý" : "khảo sát lần đầu"}`].join("\n") });
     docgenStore.patchJob(job.id, {
       status: "surveying", error: null,
-      survey: { startedAt: started, revise: revise || null, account: account.id, activity: "Bắt đầu khảo sát…" },
+      survey: { startedAt: started, revise: revise || null, account: account.id,
+        activity: "Bắt đầu khảo sát…", runId, logHost: run.host, logFile: run.file },
     });
     emit(docgenStore.getJob(job.id));
 
@@ -654,7 +856,7 @@ export function registerDocRoutes(app, broadcast = () => {}) {
 
     runSurvey({
       job, std, repoPath: project.repo_path, configDir: account.configDir,
-      model: settings.model, allowCommands: settings.allowCommands !== false,
+      model: eco.model || settings.model, allowCommands: settings.allowCommands !== false,
       revise, plan,
       onSpawn: (child) => running.set(job.id, { child, startedAt: started }),
       onEvent: (e) => {
@@ -663,13 +865,19 @@ export function registerDocRoutes(app, broadcast = () => {}) {
           tokens += (u.input_tokens || 0) + (u.output_tokens || 0)
             + (u.cache_creation_input_tokens || 0) + (u.cache_read_input_tokens || 0);
         }
+        say({ kind: e.kind, text: e.text, detail: e.detail, code: e.code });
         const cur = docgenStore.getJob(job.id);
         if (!cur) return;
-        docgenStore.patchJob(job.id, { survey: { ...cur.survey, activity: e.text || cur.survey?.activity } });
+        // stderr/stdout không lên thanh activity: chúng là dòng kỹ thuật, chỗ của chúng là Console.
+        if (e.kind !== "stderr" && e.kind !== "stdout")
+          docgenStore.patchJob(job.id, { survey: { ...cur.survey, activity: e.text || cur.survey?.activity } });
         broadcast({ type: "doc:activity", jobId: job.id, text: e.text || "", kind: e.kind });
       },
     }).then(({ survey, exitError }) => {
       running.delete(job.id);
+      runlog.endRun(job.id, { stage: "survey", ok: true,
+        text: `■ khảo sát xong · ${Math.round((Date.now() - started) / 1000)}s · ${tokens} token`,
+        detail: exitError ? `CLI thoát bất thường nhưng tệp kết quả vẫn đọc được: ${exitError}` : undefined });
       const built = buildPlan({ std, projectName: job.projectName, survey, outlineDepth: job.style?.outlineDepth });
       const merged = revise && plan ? mergeRevision(plan, built) : built;
       docgenStore.putPlan(job.id, merged);
@@ -685,16 +893,49 @@ export function registerDocRoutes(app, broadcast = () => {}) {
       emit(next, { plan: merged });
     }).catch((err) => {
       running.delete(job.id);
+      // Lý do đầy đủ vào log; `error.message` chỉ 500 ký tự cho thẻ UI.
+      runlog.endRun(job.id, { stage: "survey", ok: false, text: `✖ khảo sát thất bại`,
+        detail: String(err.stack || err.message) });
       const cur = docgenStore.getJob(job.id);
       if (!cur) return;
       const next = docgenStore.patchJob(job.id, {
         status: "error",
-        error: { kind: "survey", message: String(err.message).slice(0, 500) },
+        error: { kind: "survey", message: String(err.message).slice(0, 500), runId },
         survey: { ...cur.survey, finishedAt: Date.now(), tokens },
       });
       emit(next);
     });
   }
+}
+
+// Dấu vết trong job rằng đã từng có lượt chạy, và lượt gần nhất chạy ở máy nào.
+//
+// Cần vì log là tệp cục bộ còn job có thể đến từ database dùng chung (nhánh `local-work`): "không có
+// dòng nào" phải phân biệt được "chưa chạy lần nào" với "đã chạy, log ở máy khác hoặc đã bị xoá".
+// `logHost` chỉ có từ D2.1 trở đi, nên job cũ sẽ ra `ranHost: null` → rơi vào "missing", đúng hơn là
+// khẳng định sai về một máy nào đó.
+function ranInfoOf(job) {
+  const w = job?.write || {}, s = job?.survey || {};
+  const ran = !!(w.startedAt || s.startedAt || job?.metrics?.tokens);
+  return { ran, ranHost: w.logHost || s.logHost || null };
+}
+
+// Một câu giải thích cho mỗi trạng thái log. Đặt ở server để tệp tải về, thông báo lỗi và màn hình
+// đều nói cùng một câu.
+function logStateMessage(st) {
+  if (st.state === "never")
+    return "Bộ tài liệu này chưa chạy lượt nào nên chưa có log. Log được ghi từ lúc bấm Khảo sát "
+      + "hoặc Bắt đầu viết.";
+  if (st.state === "other-host")
+    return `Lượt chạy gần nhất thực hiện trên máy “${st.ranHost}”, còn máy này là “${st.host}”. `
+      + "Log phiên agent là tệp trên đĩa nên nó KHÔNG đi theo cơ sở dữ liệu — nó vẫn nằm ở máy kia, "
+      + `tại ${st.file}. Chạy lại trên máy này thì sẽ có log mới.`;
+  if (st.state === "missing")
+    return `Bộ tài liệu này đã từng chạy nhưng không còn tệp log ở máy này. Thường là do thư mục `
+      + `docgen-work đã bị xoá, hoặc dataDir đã đổi. Đường dẫn đang tìm: ${st.file}`;
+  if (st.state === "unreadable")
+    return `Có tệp log nhưng mở không được (quyền truy cập, hoặc tệp đang bị khoá): ${st.file}`;
+  return "";
 }
 
 // A section is addressed by its plan id everywhere in the API; this is the one place that resolves
@@ -707,6 +948,11 @@ function findPlanSection(plan, id) {
   return null;
 }
 
+// Một đoạn đường dẫn an toàn cho mọi OS. Tên project/bộ tài liệu do người dùng đặt nên có thể chứa
+// `:` `/` `?` — Windows từ chối thẳng. Giữ chữ có dấu (\p{L}) vì tên tiếng Việt là bình thường.
+const safeSeg = (s) => String(s).replace(/[^\p{L}\p{N} ._-]+/gu, "-")
+  .replace(/\s+/g, " ").replace(/^[-. ]+|[-. ]+$/g, "").slice(0, 80) || "khong-ten";
+
 // Document identifier: the prefix the user chose for this set plus a short tag per document, so
 // six files of one standard do not all carry the same id.
 function docIdFor(job, doc) {
@@ -717,8 +963,13 @@ function docIdFor(job, doc) {
 
 // The payload render.py consumes. Sections switched off at approval are not in the file at all;
 // sections not yet written are, so the reader can see what is still missing.
-function exportSpecs({ job, std, plan, ir, keys, draft }) {
+function exportSpecs({ job, std, plan, ir, keys, draft, dateStamp = false }) {
   const version = job.meta?.history?.at(-1)?.version || "0.1";
+  // Ngày theo giờ máy, không phải UTC: người dùng đọc tên tệp bằng lịch của họ.
+  const d = new Date();
+  const stamp = dateStamp
+    ? ` ${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+    : "";
   const out = [];
   for (const d of plan.docs || []) {
     if (keys && !keys.includes(d.key)) continue;
@@ -728,7 +979,7 @@ function exportSpecs({ job, std, plan, ir, keys, draft }) {
     if (!sections.length) continue;
     const base = String(d.file || `${d.title}.docx`).replace(/\.docx$/i, "");
     out.push({
-      key: d.key, file: `${base} v${version}.docx`, title: d.title,
+      key: d.key, file: `${base} v${version}${stamp}.docx`, title: d.title,
       project: job.projectName || "", docId: docIdFor(job, d), version,
       classification: job.meta?.classification || "",
       docStatus: draft ? "Bản nháp" : (job.meta?.docStatus || ""),

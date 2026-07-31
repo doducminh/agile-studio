@@ -20,16 +20,42 @@ function read() {
 function write(d) { writeFileSync(FILE, JSON.stringify(d, null, 2)); }
 function nextId(d) { return d.seq++; }
 
+// Tên và đường dẫn của project mẫu do Agile Studio tự dựng. Người dùng không được tạo project
+// trùng: trùng tên thì cổng chặn docgen (chỉ so tên) sẽ mở sai cho một repo thật, trùng đường dẫn
+// thì lần boot sau ensureDemoProject() sẽ trỏ lại và cướp mất project của họ.
+// Đặt ở đây, không import từ docgen/, để store.js không phụ thuộc vào feature.
+const RESERVED_NAME = "stale-demo";
+const RESERVED_DIR_TAIL = "/demo/stale-demo";
+const norm = (p) => String(p || "").replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
+
 export const store = {
   listProjects() { return read().projects.slice().reverse(); },
-  addProject(name, repo_path) {
+  // opts.internal: lối vào của ensureDemoProject(), bỏ qua chặn tên/đường dẫn dành riêng.
+  addProject(name, repo_path, opts = {}) {
     const d = read();
-    if (d.projects.some((p) => p.repo_path === repo_path)) throw new Error("Repo đã tồn tại");
+    if (d.projects.some((p) => norm(p.repo_path) === norm(repo_path))) throw new Error("Repo đã tồn tại");
+    if (!opts.internal) {
+      if (String(name || "").trim().toLowerCase() === RESERVED_NAME)
+        throw new Error(`Tên “${RESERVED_NAME}” dành cho project mẫu do Studio tự tạo — chọn tên khác.`);
+      if (norm(repo_path).endsWith(RESERVED_DIR_TAIL))
+        throw new Error(`Thư mục này là bản chạy của project mẫu “${RESERVED_NAME}” — chọn thư mục khác.`);
+    }
     const id = nextId(d);
-    d.projects.push({ id, name, repo_path, created_at: new Date().toISOString() });
+    d.projects.push({ id, name, repo_path, created_at: new Date().toISOString(),
+      ...(opts.internal ? { internal: true } : {}) });
     write(d); return { lastInsertRowid: id };
   },
   getProject(id) { return read().projects.find((p) => p.id === Number(id)); },
+  // Chuyển project sang thư mục khác. Cần vì project mẫu của phiên trước trỏ vào một thư mục temp
+  // đã bị dọn; sửa đường dẫn tại chỗ giữ nguyên id nên mọi bộ tài liệu đã tạo vẫn còn chủ.
+  setProjectPath(id, repo_path) {
+    const d = read();
+    const p = d.projects.find((x) => x.id === Number(id));
+    if (!p) return null;
+    p.repo_path = repo_path;
+    write(d);
+    return p;
+  },
 
   listRequirements(pid) {
     return read().requirements.filter((r) => r.project_id === Number(pid))

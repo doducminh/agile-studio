@@ -8,6 +8,7 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync, renameSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
+import { ECONOMY_DEFAULTS, normalizeEconomy } from "../docgen/economy.js";
 
 // Same data directory as store.js. Branches that have the .env config module win over the default.
 let DIR = join(homedir(), ".agile-studio");
@@ -18,13 +19,16 @@ try {
 
 mkdirSync(DIR, { recursive: true });
 const FILE = join(DIR, "docgen.json");
+// Where the demo project's working copy lives. Exported because demo.js owns that folder and must
+// resolve it the same way as everything else that reads this data directory.
+export const DATA_DIR = DIR;
 // Scratch space for agent output. Never inside the project repo: a survey must not dirty it.
 export const WORK_DIR = join(DIR, "docgen-work");
 
 const empty = () => ({
   jobs: {}, plans: {}, ir: {}, scores: {}, findings: {}, exports: {},
   presets: {}, templates: {}, profiles: {}, tools: {},
-  settings: { tokenThreshold: 50000, dontAsk: {}, tokensPer5h: 2000000 },
+  settings: { tokenThreshold: 50000, dontAsk: {}, tokensPer5h: 2000000, economy: { ...ECONOMY_DEFAULTS } },
   seq: 1,
 });
 
@@ -221,12 +225,20 @@ export const docgenStore = {
     delete data.presets[id]; deletedIds.add(id); persist(); return true;
   },
 
-  // ---- settings (token threshold + "đừng hỏi lại" per kind of work) ----
-  getSettings() { return clone(data.settings); },
+  // ---- settings (token threshold + "đừng hỏi lại" per kind of work + economy mode) ----
+  getSettings() {
+    // A file written before economy mode existed has no `economy` key; filling the default in on
+    // read (not on load) means an old docgen.json keeps working and gains the safe default.
+    return clone({ ...data.settings, economy: { ...ECONOMY_DEFAULTS, ...(data.settings.economy || {}) } });
+  },
   setSettings(patch) {
-    data.settings = { ...data.settings, ...patch, dontAsk: { ...data.settings.dontAsk, ...(patch.dontAsk || {}) } };
+    const economy = patch.economy !== undefined
+      ? normalizeEconomy(patch.economy, data.settings.economy)
+      : { ...ECONOMY_DEFAULTS, ...(data.settings.economy || {}) };
+    data.settings = { ...data.settings, ...patch, economy,
+      dontAsk: { ...data.settings.dontAsk, ...(patch.dontAsk || {}) } };
     persist();
-    return clone(data.settings);
+    return this.getSettings();
   },
 
   // Test hook: force the debounced write to happen now.

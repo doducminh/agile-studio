@@ -22,6 +22,8 @@ import { WORK_DIR, docgenStore } from "../store/docgen.js";
 import { toneById } from "./tones.js";
 import { KIND_LABELS } from "./standards/vocab.js";
 import { normalizeSection, sectionMetrics, jobMetrics, pagesOf } from "./ir.js";
+import { economyOf, modelFor, capTargets } from "./economy.js";
+import * as runlog from "./runlog.js";
 
 const pexecFile = promisify(execFile);
 
@@ -100,7 +102,37 @@ function sectionSpec(t, jobId) {
   ].join("\n");
 }
 
-export function buildWritePrompt({ job, std, doc, targets, extraSources = [] }) {
+// Bản prompt rút gọn cho chế độ tiết kiệm. Giữ đúng hai thứ quyết định luồng chạy được kiểm hay
+// không: LƯỢC ĐỒ TỆP (agent phải ghi ra JSON đúng chỗ) và LUẬT VỀ NGUỒN (ca 2 kiểm khối có nguồn).
+// Bỏ phần văn phong, quy ước khối và danh sách 9 loại khối — chúng chỉ đổi chất lượng văn.
+function buildShortWritePrompt({ job, std, doc, targets }) {
+  return `Bạn đang VIẾT NỘI DUNG cho tài liệu "${doc.title}" theo chuẩn ${std.standard || std.label}.
+Thư mục hiện tại là mã nguồn thật. Đây là lượt chạy TIẾT KIỆM: viết NGẮN, mỗi mục 1–2 khối, đừng đọc
+rộng — chỉ đọc đúng tệp cần cho mục đang viết.
+
+Viết bằng TIẾNG VIỆT. Không đổi tên mục. Giữ nguyên tên định danh trong mã.
+
+LUẬT VỀ NGUỒN — bắt buộc
+Mỗi khối phải có "sources": [{ "file": "đường/dẫn/thật", "lines": [từ, đến] }] với đường dẫn tương đối
+so với gốc repo và tồn tại thật. Khối không dẫn được về mã nguồn thì khai "assumption": true.
+
+CÁC MỤC CẦN VIẾT
+${targets.map((t) => sectionSpec(t, job.id)).join("\n\n")}
+
+LƯỢC ĐỒ TỆP KẾT QUẢ (một tệp một mục, đúng JSON, không kèm văn bản nào khác)
+{ "blocks": [ { "t": "p", "text": "…", "sources": [{ "file": "src/a.ts", "lines": [1, 20] }] } ] }
+Loại khối dùng được: "p" (đoạn văn), "bullets" (kèm "items"), "table" (kèm "headers" và "rows").
+
+CÁCH LÀM
+1. Đọc đúng tệp cần cho mục đang viết, không đọc thêm.
+2. Dùng công cụ Write ghi tệp kết quả ra ĐÚNG đường dẫn đã ghi ở trên, xong mục nào ghi ngay mục đó.
+3. Không sửa bất kỳ tệp nào trong mã nguồn.
+
+Xong tất cả thì trả lời đúng một dòng: WRITE_DONE`;
+}
+
+export function buildWritePrompt({ job, std, doc, targets, extraSources = [], eco = null }) {
+  if (eco?.shortPrompt) return buildShortWritePrompt({ job, std, doc, targets });
   const tone = toneById(job.style?.tone);
   const glossary = glossaryFor(job);
   const facts = job.facts?.items || [];
@@ -196,6 +228,8 @@ class WriteRun {
     this.engine = ENGINES.includes(engine) ? engine : "per-doc";
     this.only = only && only.length ? new Set(only) : null;
     this.broadcast = broadcast || (() => {});
+    this.eco = economyOf(docgenStore.getSettings());
+    this.deferred = 0;            // sections the economy cap pushed to a later run
     this.children = new Set();
     this.pending = new Map();      // absolute out file -> target
     this.marked = new Set();       // section ids already shown as "writing"
@@ -210,14 +244,34 @@ class WriteRun {
   }
 
   // ---- lifecycle ----
+  // Một dòng log + phát ra WS trong cùng một chỗ, để thứ trên màn hình và thứ trong tệp .log
+  // không bao giờ lệch nhau.
+  say(entry) {
+    const row = runlog.log(this.jobId, { stage: "write", run: this.runId, ...entry });
+    this.broadcast({ type: "doc:log", jobId: this.jobId, entry: row });
+    return row;
+  }
+
   async begin() {
     const cli = ensureClaudeOnPath();
     if (!cli.ok) throw new Error("Không tìm thấy Claude CLI. " + cli.hint);
+    const run = runlog.beginRun(this.jobId, { stage: "write", engine: this.engine });
+    this.runId = run.runId;
     this.commit = await headCommit(this.repoPath);
+    this.say({ kind: "info", text: `⚙ cấu hình lượt viết`,
+      detail: [`engine:   ${this.engine}`, `account:  ${this.account.id}`,
+        `repo:     ${this.repoPath}`, `commit:   ${this.commit || "(không phải repo git)"}`,
+        `model:    ${modelFor(this.eco, this.appSettings.model) || "(mặc định theo account)"}`,
+        `tiết kiệm: ${this.eco.on ? this.eco.notes.join(" · ") : "tắt"}`,
+        `chỉ định: ${this.only ? [...this.only].join(", ") : "(mọi mục còn thiếu)"}`].join("\n") });
     docgenStore.patchJob(this.jobId, {
       status: "writing", error: null,
       write: { startedAt: this.startedAt, engine: this.engine, account: this.account.id,
-        activity: "Bắt đầu viết…", finishedAt: null, warning: null },
+        activity: "Bắt đầu viết…", finishedAt: null, warning: null,
+        economy: this.eco.on ? this.eco.notes : null, runId: this.runId,
+        // Đóng dấu máy + đường dẫn log: log là tệp cục bộ, không đi theo DB. Mở job này trên một
+        // máy khác thì đây là thứ duy nhất giải thích được log đang ở đâu.
+        logHost: run.host, logFile: run.file },
     });
     this.emitJob();
     this.sweeper = setInterval(() => this.sweep(), SWEEP_MS);
@@ -239,15 +293,19 @@ class WriteRun {
 
   stop() {
     this.stopped = true;
+    this.say({ kind: "info", text: "⏸ người dùng bấm tạm dừng" });
     this.setActivity("Đang dừng…");
     this.killAll();
   }
 
   setEngine(engine) {
     if (!ENGINES.includes(engine) || engine === this.engine) return false;
+    const from = this.engine;
     this.engine = engine;
     this.restart = true;
     docgenStore.patchJob(this.jobId, { run: { engine } });
+    this.say({ kind: "info", text: `⇄ đổi cách chạy ${from} → ${engine}`,
+      detail: "Phiên đang chạy bị kill; mục đã có tệp kết quả vẫn được ingest ở lượt sweep kế tiếp." });
     this.setActivity(`Đổi cách chạy sang “${engine}” — dừng gọn phiên đang chạy, giữ nguyên mục đã viết.`);
     this.killAll();
     return true;
@@ -274,15 +332,26 @@ class WriteRun {
         if (this.only) { if (!this.only.has(s.id)) continue; }
         else if (docgenStore.getIrSection(this.jobId, key) && s.status !== "stale") continue;
         const file = irFileFor(this.jobId, doc.key, s.num);
-        try { rmSync(file, { force: true }); } catch { /* nothing there yet */ }
         // The suffix is what an activity line ("✍️ viết …/ir/sad/6.2.json") is matched against.
         const suffix = `${safeKey(doc.key)}/${String(s.num).replace(/[^0-9.]/g, "_")}.json`;
         const t = { docKey: doc.key, doc, section: s, key, file, suffix };
-        this.pending.set(file, t);
         out.push(t);
       }
     }
-    return out;
+    // Giới hạn của chế độ tiết kiệm áp ở ĐÂY, sau khi đã biết chính xác mục nào còn thiếu: phần bị
+    // hoãn giữ nguyên trạng thái pending nên bấm Tiếp tục là chạy đúng chúng, không mất mục nào.
+    const { targets, deferred } = capTargets(out, this.eco);
+    this.deferred = deferred;
+    if (deferred) this.say({ kind: "info", text: `💰 tiết kiệm: lượt này chỉ nhận ${targets.length}/${out.length} mục`,
+      detail: `Hoãn ${deferred} mục sang lượt sau (bấm Tiếp tục). Giới hạn: ${this.eco.maxSections} mục/lượt.\n`
+        + `Hoãn: ${out.slice(targets.length).map((t) => `${t.docKey} §${t.section.num}`).join(", ")}` });
+    // Chỉ xoá tệp cũ của những mục THẬT SỰ chạy lượt này — xoá cả phần bị hoãn thì mất kết quả
+    // của mục stale đang chờ viết lại.
+    for (const t of targets) {
+      try { rmSync(t.file, { force: true }); } catch { /* nothing there yet */ }
+      this.pending.set(t.file, t);
+    }
+    return targets;
   }
 
   async runPass(targets) {
@@ -318,21 +387,30 @@ class WriteRun {
     const prompt = buildWritePrompt({
       job: this.job, std: this.std, doc, targets,
       extraSources: (this.job.sources?.extra || []).filter((e) => e.kind === "reference"),
+      eco: this.eco,
     });
     let sessionId = randomUUID();
     let account = this.account;
     let resume = false;
     let retries = 0;
+    this.say({ session: label, kind: "info", text: `▶ phiên “${label}” · ${targets.length} mục`,
+      detail: `mục: ${targets.map((t) => `${t.section.num} ${t.section.title}`).join(" · ")}\n`
+        + `prompt: ${prompt.length} ký tự${this.eco.shortPrompt ? " (bản rút gọn)" : ""}` });
     for (;;) {
       try {
-        await this.spawn({ prompt, account, sessionId, resume });
+        await this.spawn({ prompt, account, sessionId, resume, label });
         return;
       } catch (err) {
         if (this.stopped || this.restart) return;
         // A written file wins over an exit code: nothing left pending means the session did
         // its job and only the process teardown failed.
         this.sweep();
-        if (targets.every((t) => !this.pending.has(t.file))) return;
+        if (targets.every((t) => !this.pending.has(t.file))) {
+          this.say({ session: label, kind: "info",
+            text: `↩ ${label}: CLI thoát lỗi nhưng mọi mục đã ghi ra tệp — coi là xong`,
+            detail: String(err.message) });
+          return;
+        }
         const spare = RATE_RE.test(String(err.message)) ? this.spares.shift() : null;
         if (!spare) {
           // The CLI exits non-zero without producing anything often enough to be worth one retry:
@@ -341,6 +419,9 @@ class WriteRun {
           // Losing a whole document to a transient spawn is far more expensive than trying twice.
           if (retries < MAX_TRANSIENT_RETRIES) {
             retries++;
+            this.say({ session: label, kind: "run-error",
+              text: `⚠ ${label}: phiên thoát bất thường, thử lại lần ${retries}`,
+              detail: String(err.message) });
             this.setActivity(`⚠ ${label}: phiên thoát bất thường, thử lại lần ${retries}…`);
             await new Promise((r) => setTimeout(r, 4000));
             if (this.stopped || this.restart) return;
@@ -349,6 +430,12 @@ class WriteRun {
             continue;
           }
           const msg = explainSpawnError(err);
+          // Lý do đầy đủ đi vào log; `section.error` chỉ giữ 300 ký tự cho thẻ UI, nên nếu không
+          // ghi ở đây thì phần CLI thật sự nói ra sẽ mất hẳn — đúng lỗ hổng của ca 11.
+          this.say({ session: label, kind: "run-error", text: `✖ ${label}: ${msg.slice(0, 160)}`,
+            detail: [`giải thích: ${msg}`, "", `lỗi gốc: ${err.message}`,
+              `mục chưa ghi được: ${targets.filter((t) => this.pending.has(t.file))
+                .map((t) => t.section.num).join(", ")}`].join("\n") });
           for (const t of targets) {
             if (!this.pending.has(t.file)) continue;
             this.pending.delete(t.file);
@@ -366,26 +453,30 @@ class WriteRun {
         docgenStore.patchJob(this.jobId, {
           write: { ...(docgenStore.getJob(this.jobId)?.write || {}), account: spare.id },
         });
+        this.say({ session: label, kind: "run-error",
+          text: `⚠ hết quota — đổi sang account “${spare.label || spare.id}”`,
+          detail: `lỗi gốc: ${err.message}\nsession ${sessionId} được copy transcript rồi --resume.` });
         this.setActivity(`⚠ Account hết quota — chuyển sang “${spare.label || spare.id}”, `
           + "phiên cũ được nối lại nên ngữ cảnh vẫn giữ.");
       }
     }
   }
 
-  spawn({ prompt, account, sessionId, resume }) {
+  spawn({ prompt, account, sessionId, resume, label }) {
     let child = null;
     return runClaude({
       prompt, cwd: this.repoPath, configDir: account.configDir,
-      model: this.appSettings.model,
+      model: modelFor(this.eco, this.appSettings.model),
       allowCommands: this.appSettings.allowCommands !== false,
       sessionId: resume ? undefined : sessionId,
       resumeSessionId: resume ? sessionId : undefined,
+      verbose: true,          // mọi tham số tool, toàn văn Claude nói, stderr và mã thoát vào log
       onSpawn: (c) => { child = c; this.children.add(c); },
-      onEvent: (e) => this.onEvent(e),
+      onEvent: (e) => this.onEvent(e, label),
     }).finally(() => { if (child) this.children.delete(child); });
   }
 
-  onEvent(e) {
+  onEvent(e, label = null) {
     if (e.kind === "result") {
       const u = e.usage || {};
       this.tokens += (u.input_tokens || 0) + (u.output_tokens || 0)
@@ -407,7 +498,10 @@ class WriteRun {
         break;
       }
     }
-    if (text) this.setActivity(text);
+    // Dòng activity một câu vẫn giữ nguyên cho thanh trạng thái; bản đầy đủ đi vào log.
+    if (text && e.kind !== "stderr" && e.kind !== "stdout") this.setActivity(text);
+    this.say({ session: label, kind: e.kind, text, detail: e.detail, code: e.code,
+      tokens: e.kind === "result" ? this.tokens : undefined });
     this.broadcast({ type: "doc:activity", jobId: this.jobId, text, kind: e.kind });
   }
 
@@ -430,6 +524,11 @@ class WriteRun {
     if (!ir.blocks.length) {
       const msg = "Agent ghi ra tệp nhưng không có khối nội dung nào đọc được.";
       this.failed.push({ id: t.section.id, message: msg });
+      // Nội dung tệp agent thật sự ghi ra là thứ duy nhất giải thích được vì sao không parse ra
+      // khối nào — không log lại thì phải mở tay tệp trong docgen-work mới biết.
+      this.say({ kind: "run-error", text: `✖ §${t.section.num}: ${msg}`,
+        detail: `tệp: ${t.file}\n\n--- nội dung agent ghi ---\n`
+          + JSON.stringify(raw, null, 1).slice(0, 4000) });
       docgenStore.patchPlanSection(this.jobId, t.section.id, { status: "error", error: msg });
       this.emitSection(t, "error", null, msg);
       return;
@@ -491,16 +590,24 @@ class WriteRun {
     const errors = (plan?.docs || []).flatMap((d) => d.sections || [])
       .filter((s) => s.status === "error").length;
     const left = total.sections - total.done;
-    const status = this.stopped ? "paused" : errors ? "error" : left ? "error" : "editing";
+    // Mục bị chế độ tiết kiệm hoãn KHÔNG phải lỗi: chúng còn pending đúng như thiết kế. Đánh dấu
+    // `error` ở đây sẽ hiện một hộp đỏ cho một lượt chạy hoàn toàn bình thường.
+    const paused = this.stopped;
+    const deferredOnly = !paused && !errors && left > 0 && this.deferred >= left;
+    const status = paused ? "paused" : errors ? "error" : deferredOnly ? "paused" : left ? "error" : "editing";
     const cur = docgenStore.getJob(this.jobId);
     docgenStore.patchJob(this.jobId, {
       status,
       error: status === "error"
-        ? { kind: "write", message: `${errors || left} mục chưa viết được — bấm Tiếp tục để chạy lại đúng những mục đó.` }
+        ? { kind: "write", message: `${errors || left} mục chưa viết được — bấm Tiếp tục để chạy lại đúng những mục đó.`,
+            runId: this.runId }
         : null,
       write: {
-        ...(cur?.write || {}), finishedAt: Date.now(), engine: this.engine,
-        activity: this.stopped ? "Đã tạm dừng." : errors || left ? "Kết thúc với mục chưa xong." : "Đã viết xong.",
+        ...(cur?.write || {}), finishedAt: Date.now(), engine: this.engine, runId: this.runId,
+        deferred: this.deferred || 0,
+        activity: paused ? "Đã tạm dừng."
+          : deferredOnly ? `Xong lượt tiết kiệm — còn ${left} mục, bấm Tiếp tục.`
+          : errors || left ? "Kết thúc với mục chưa xong." : "Đã viết xong.",
       },
       metrics: {
         ...cur?.metrics, sections: total.sections, done: total.done,
@@ -509,6 +616,12 @@ class WriteRun {
         elapsedMs: this.elapsedBase + (Date.now() - this.startedAt),
       },
     });
+    runlog.endRun(this.jobId, { stage: "write", ok: status !== "error",
+      text: `■ hết lượt · ${this.done} mục viết được · ${total.done}/${total.sections} tổng cộng`,
+      detail: [`kết thúc ở trạng thái: ${status}`,
+        `mục lỗi: ${errors} · mục còn thiếu: ${left} · bị hoãn do tiết kiệm: ${this.deferred}`,
+        `token lượt này: ${this.tokens} · tổng: ${this.tokenBase + this.tokens}`,
+        `thời gian: ${Math.round((Date.now() - this.startedAt) / 1000)}s`].join("\n") });
     docgenStore.flush();
     this.broadcast({ type: "doc:job", jobId: this.jobId, job: docgenStore.getJob(this.jobId) });
   }

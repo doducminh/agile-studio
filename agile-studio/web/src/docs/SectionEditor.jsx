@@ -72,7 +72,7 @@ export default function SectionEditor({ open, section, ir, onCancel, onSave }) {
   return (
     <Dialog open={open} width={860} onClose={onCancel}
       title={`✎ Sửa tay mục ${section?.num || ""} — ${section?.title || ""}`}
-      sub="Sửa tay không tiêu token. Sau khi lưu, mục này được đánh dấu “đã sửa tay” và agent sẽ không ghi đè nó ở lần viết lại."
+      sub="Sau khi lưu, mục này được đánh dấu “đã sửa tay” và agent sẽ không ghi đè nó ở lần viết lại."
       footer={<DialogButtons onCancel={onCancel} onOk={save} okDisabled={busy}
         okLabel={busy ? "Đang lưu…" : "💾 Lưu & đánh dấu đã sửa tay"} />}>
       {err && <div className="dg-err">{err}</div>}
