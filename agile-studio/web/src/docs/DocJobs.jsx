@@ -25,25 +25,44 @@ const STATUS = {
 // Which stages have content to show, i.e. when the card offers "Tiến độ →" instead of the outline.
 const WRITTEN_STAGES = ["writing", "editing", "paused", "ready"];
 
-export default function DocJobs({ project }) {
+// `view` đến từ URL (App.jsx → router.js), không còn là state nội bộ. Đó là điểm sửa của bug "bấm
+// sang project khác mà nội dung bên phải vẫn của project cũ": component này không remount khi đổi
+// project, nên một `useState` ở đây sống sót qua lần đổi và tiếp tục vẽ dàn ý của project đã rời.
+export default function DocJobs({ project, view, onView, onJobName }) {
   const [jobs, setJobs] = useState([]);
   const [standards, setStandards] = useState([]);
   const [composable, setComposable] = useState([]);
   const [tones, setTones] = useState([]);
   const [settings, setSettings] = useState(null);
-  const [view, setView] = useState({ name: "list" });
   const [storage, setStorage] = useState(null);
   const [cli, setCli] = useState(null);
   const [err, setErr] = useState("");
+  // Danh sách đang cầm là của project NÀO. Không có nó thì lúc vừa đổi project, `jobs` còn là của
+  // project cũ và mọi phép kiểm "bộ này có thuộc project này không" đều trả lời sai.
+  const [loadedFor, setLoadedFor] = useState(null);
 
   const loadJobs = useCallback(() => {
     fetch(`/api/projects/${project.id}/doc-jobs`).then((r) => r.json()).then((d) => {
       if (d.error) return setErr(d.error);
       setJobs(d.jobs || []); setStorage(d.storage || null); setCli(d.cli || null);
+      setLoadedFor(project.id);
     }).catch((e) => setErr(String(e.message)));
   }, [project.id]);
 
   useEffect(loadJobs, [loadJobs]);
+
+  const openJob = view.jobId ? jobs.find((j) => j.id === view.jobId) : null;
+
+  // Bộ tài liệu trong URL không thuộc project trong URL → về danh sách. Xảy ra thật khi sửa tay URL,
+  // khi bộ bị xoá ở tab khác, hoặc khi dán link của project khác.
+  useEffect(() => {
+    if (loadedFor !== project.id || !view.jobId) return;
+    if (!openJob) onView({ name: "list" });
+  }, [loadedFor, project.id, view.jobId, openJob]); // eslint-disable-line
+
+  // Báo tên bộ đang mở lên App để nó vá slug trên URL khi bộ bị đổi tên.
+  useEffect(() => { onJobName?.(openJob?.name || ""); }, [openJob?.name]); // eslint-disable-line
+
   useEffect(() => {
     fetch("/api/doc-standards").then((r) => r.json())
       .then((d) => { setStandards(d.standards || []); setComposable(d.composable || []); setTones(d.tones || []); })
@@ -83,13 +102,19 @@ export default function DocJobs({ project }) {
     fetch(`/api/doc-jobs/${id}`, { method: "DELETE" }).then(() => loadJobs());
   };
 
+  // `onCreated` chèn bộ vừa tạo vào danh sách TRƯỚC khi điều hướng: nếu chỉ gọi loadJobs() rồi đi
+  // ngay thì phép kiểm "bộ có thuộc project này không" ở trên chạy với danh sách cũ (chưa có bộ mới)
+  // và đá thẳng người dùng về màn danh sách.
   if (view.name === "wizard")
     return (
       <div className="dg">
         <DocWizard project={project} standards={standards} composable={composable} tones={tones}
           settings={settings} onSettings={saveSettings}
-          onCancel={() => setView({ name: "list" })}
-          onCreated={(job) => { loadJobs(); setView({ name: "outline", jobId: job.id }); }} />
+          onCancel={() => onView({ name: "list" })}
+          onCreated={(job) => {
+            setJobs((prev) => [job, ...prev]); loadJobs();
+            onView({ name: "outline", jobId: job.id, jobName: job.name });
+          }} />
       </div>
     );
 
@@ -97,8 +122,8 @@ export default function DocJobs({ project }) {
     return (
       <div className="dg">
         <DocOutline jobId={view.jobId} settings={settings} onSettings={saveSettings}
-          onBack={() => { loadJobs(); setView({ name: "list" }); }} onJobChanged={loadJobs}
-          onWrite={() => setView({ name: "progress", jobId: view.jobId })} />
+          onBack={() => { loadJobs(); onView({ name: "list" }); }} onJobChanged={loadJobs}
+          onWrite={() => onView({ name: "progress", jobId: view.jobId, jobName: openJob?.name })} />
       </div>
     );
 
@@ -106,7 +131,7 @@ export default function DocJobs({ project }) {
     return (
       <div className="dg">
         <DocProgress jobId={view.jobId} settings={settings} onSettings={saveSettings}
-          onBack={() => { loadJobs(); setView({ name: "list" }); }} onJobChanged={loadJobs} />
+          onBack={() => { loadJobs(); onView({ name: "list" }); }} onJobChanged={loadJobs} />
       </div>
     );
 
@@ -116,7 +141,7 @@ export default function DocJobs({ project }) {
         <b className="dg-h1">📚 Tài liệu sản phẩm</b>
         <span className="dg-sub">theo chuẩn quốc tế · chỉ của project {project.name}</span>
         <span className="dg-spacer" />
-        <button className="primary" onClick={() => setView({ name: "wizard" })}>＋ Bộ tài liệu mới</button>
+        <button className="primary" onClick={() => onView({ name: "wizard" })}>＋ Bộ tài liệu mới</button>
       </div>
 
       {err && <div className="dg-err">{err}</div>}
@@ -180,13 +205,13 @@ export default function DocJobs({ project }) {
 
                 <div className="dg-job-acts">
                   {j.status !== "surveying" &&
-                    <button className="mini" onClick={() => setView({ name: "outline", jobId: j.id })}>
+                    <button className="mini" onClick={() => onView({ name: "outline", jobId: j.id, jobName: j.name })}>
                       {j.status === "plan-review" ? "Duyệt dàn ý →" : j.planApproved ? "Xem dàn ý →" : "Dàn ý →"}
                     </button>}
                   {/* Anything past the approval gate has a progress screen, even before a single
                       section is written: that is where the ▶ Bắt đầu viết button lives. */}
                   {j.planApproved &&
-                    <button className="mini" onClick={() => setView({ name: "progress", jobId: j.id })}>
+                    <button className="mini" onClick={() => onView({ name: "progress", jobId: j.id, jobName: j.name })}>
                       {written || j.error?.kind === "write" ? "Tiến độ →" : "Viết nội dung →"}
                     </button>}
                   {/* "Tiếp tục" after a failed survey retries the survey; after a failed write the
