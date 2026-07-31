@@ -76,6 +76,9 @@ body { margin:0; background:var(--bg); color:var(--ink); font-family:var(--mono)
 /* main */
 .main { display:flex; flex-direction:column; overflow:hidden; }
 .placeholder { margin:auto; color:var(--muted); }
+/* Topbar chỉ còn tabs · ⚙ · tên project — KHÔNG phần tử nào phụ thuộc `tab` (xem App.jsx).
+   Đó là thứ giữ chiều cao đứng yên khi đổi tab; đừng thêm nút chỉ hiện ở một tab vào đây, nút
+   hành động thuộc về vùng nội dung (`.panel-head`). */
 .topbar { display:flex; align-items:center; gap:20px; padding:14px 20px; border-bottom:1px solid var(--line); }
 .tabs { display:flex; gap:4px; }
 .tabs button { background:transparent; border:1px solid var(--line); color:var(--muted); padding:6px 14px; border-radius:7px; cursor:pointer; font-family:inherit; }
@@ -128,6 +131,13 @@ body { margin:0; background:var(--bg); color:var(--ink); font-family:var(--mono)
 .run-bar button.ghost { background:var(--surface2); color:var(--ink); border:1px solid var(--line); }
 .run-bar button.stop { background:var(--error); color:#fff; }
 .run-bar button:disabled { opacity:0.5; cursor:default; }
+
+/* Hàng tiêu đề của một tab, trong vùng nội dung. Cùng khuôn với `.dg-head` của tab 📚 Tài liệu để
+   nút hành động của mọi tab nằm ở cùng một chỗ. */
+.panel-head { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+.panel-h1 { font-weight:600; font-size:14px; }
+.panel-sub { color:var(--muted); font-size:11px; }
+.panel-spacer { margin-left:auto; }
 
 /* new-run button */
 .new-run { background:var(--accent); color:#0a0d18; border:none; border-radius:8px; padding:8px 16px; font-weight:600; cursor:pointer; font-family:inherit; }

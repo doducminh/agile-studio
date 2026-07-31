@@ -200,12 +200,10 @@ export default function App() {
                 <button className={tab === "prodocs" ? "on" : ""} onClick={() => setTab("prodocs")}>📚 Tài liệu</button>
                 <button className={tab === "sched" ? "on" : ""} onClick={() => setTab("sched")}>⏰ Lịch</button>
               </div>
-              {tab === "flow" && (
-                <>
-                  <button className="new-run" onClick={() => openRun()}>＋ Chạy feature</button>
-                  {runningCount > 0 && <span className="running-badge">▶ {runningCount} đang chạy</span>}
-                </>
-              )}
+              {/* Không có phần tử nào phụ thuộc `tab` ở đây. Nút "＋ Chạy feature" từng đứng chỗ này
+                  và chỉ hiện ở tab Sessions — nó vừa cao hơn nút tab 2px (padding 8px không viền vs
+                  6px + viền), vừa vào/ra khỏi luồng flex, nên topbar nhảy cả chiều cao lẫn chiều
+                  ngang mỗi lần đổi tab. Giờ nút nằm trong vùng nội dung như mọi tab khác. */}
               <button className="gear" title="Cài đặt" onClick={() => setSettingsOpen(true)}>⚙</button>
               <div className="proj-title" title={active.demo ? active.demoHint : active.repo_path}>
                 {active.name}
@@ -215,6 +213,16 @@ export default function App() {
 
             {tab === "flow" ? (
               <div className="sessions-view">
+                {/* Hàng tiêu đề của tab, cùng khuôn với `.dg-head` của tab 📚 Tài liệu: tiêu đề ·
+                    phụ đề · spacer · nút chính bên phải. */}
+                <div className="panel-head">
+                  <b className="panel-h1">🧩 Sessions</b>
+                  <span className="panel-sub">mỗi session là một feature · chạy song song được</span>
+                  <span className="panel-spacer" />
+                  {runningCount > 0 && <span className="running-badge">▶ {runningCount} đang chạy</span>}
+                  <button className="new-run" onClick={() => openRun()}>＋ Chạy feature</button>
+                </div>
+
                 <div className="session-grid">
                   {projectSessions.map((s) => (
                     <SessionCard key={s.id} session={s} selected={s.id === selectedId}
