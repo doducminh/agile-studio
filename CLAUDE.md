@@ -2,6 +2,10 @@
 
 Bối cảnh cho phiên Claude Code tiếp theo (kể cả trên máy khác). Cập nhật 2026-07-20.
 
+> **Quy chuẩn đóng góp (fork-based PR, issue/PR):** [`docs/engineering-standards.md`](docs/engineering-standards.md)
+> — đồng bộ từ [theboysvn/engineering-standards](https://github.com/theboysvn/engineering-standards).
+> Bắt buộc theo khi chạm upstream.
+
 ## Dự án
 **Agile Studio** — công cụ điều phối nhiều agent Claude Code theo quy trình
 PM → BA → DA → Dev → QC → PO. Server Express + WS, web React (Vite), 1 Discord bot.
