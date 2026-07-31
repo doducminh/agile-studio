@@ -39,3 +39,8 @@ Bản đồng bộ từ org repo **[theboysvn/engineering-standards](https://git
 - Trước khi push bản sửa: kiểm tra nhánh có commit mới của người khác → rebase.
 - **Request review** (không @mention spam); `CODEOWNERS` để tự động request; `Fixes #N` tự đóng issue
   và báo người theo dõi khi merge.
+
+## Tham chiếu (bản đầy đủ có sơ đồ)
+
+- [Vận hành quy mô lớn & Review/Merge](https://github.com/theboysvn/engineering-standards/blob/main/docs/scaling-and-review.md)
+- [Thông báo & phối hợp maintainer](https://github.com/theboysvn/engineering-standards/blob/main/docs/notifications.md)
