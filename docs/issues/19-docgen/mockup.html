@@ -1,0 +1,1361 @@
+<title>Agile Studio — Tài liệu sản phẩm (mockup v3)</title>
+
+<style>
+/* ============================================================================
+   Hai lớp trình bày:
+   - .doc-*  : lớp CHÚ GIẢI (sans, theo theme sáng/tối của người xem)
+   - .as-*   : lớp MOCKUP — dùng ĐÚNG design token của Agile Studio hiện tại
+               (web/src/styles.css), luôn tối, vì app là dark-only.
+   ========================================================================== */
+:root {
+  --page-bg:#f7f8fb; --page-surface:#ffffff; --page-line:#dfe3ee;
+  --page-ink:#171a24; --page-muted:#5b6274; --page-accent:#4a5ed8;
+  --page-warn:#c07f17;
+  --page-shadow:0 18px 44px rgba(23,26,36,.10);
+  --sans:ui-sans-serif,system-ui,"Segoe UI",Roboto,sans-serif;
+
+  /* token app — cố định, không đổi theo theme */
+  --bg:#0c0e14; --surface:#141824; --surface2:#1b2130; --line:#262d3d;
+  --ink:#e6e9f0; --muted:#6b7488; --dim:#444d61; --accent:#7c9cff;
+  --running:#ffb020; --done:#35d07f; --error:#ff5b5b;
+  --mono:ui-monospace,"JetBrains Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --page-bg:#0a0b10; --page-surface:#12141c; --page-line:#242938;
+    --page-ink:#e9ebf2; --page-muted:#8b93a8; --page-accent:#9aabff; --page-warn:#e8b552;
+    --page-shadow:0 18px 44px rgba(0,0,0,.5); }
+}
+:root[data-theme="dark"] { --page-bg:#0a0b10; --page-surface:#12141c; --page-line:#242938;
+  --page-ink:#e9ebf2; --page-muted:#8b93a8; --page-accent:#9aabff; --page-warn:#e8b552;
+  --page-shadow:0 18px 44px rgba(0,0,0,.5); }
+:root[data-theme="light"] { --page-bg:#f7f8fb; --page-surface:#ffffff; --page-line:#dfe3ee;
+  --page-ink:#171a24; --page-muted:#5b6274; --page-accent:#4a5ed8; --page-warn:#c07f17;
+  --page-shadow:0 18px 44px rgba(23,26,36,.10); }
+
+* { box-sizing:border-box; }
+body { margin:0; background:var(--page-bg); color:var(--page-ink); font-family:var(--sans);
+  font-size:15px; line-height:1.6; -webkit-font-smoothing:antialiased; }
+.wrap { max-width:1220px; margin:0 auto; padding:56px 22px 96px; display:flex; flex-direction:column; gap:54px; }
+
+.eyebrow { font-family:var(--mono); font-size:11px; letter-spacing:.16em; text-transform:uppercase;
+  color:var(--page-muted); margin:0 0 10px; }
+h1 { font-size:clamp(28px,4.2vw,44px); line-height:1.12; margin:0 0 14px; text-wrap:balance; letter-spacing:-.02em; }
+h2 { font-size:22px; margin:0; letter-spacing:-.01em; text-wrap:balance; }
+h3 { font-size:15px; margin:0 0 6px; }
+p { margin:0 0 12px; max-width:68ch; }
+.lede { font-size:17px; color:var(--page-muted); max-width:70ch; }
+a { color:var(--page-accent); }
+code { font-family:var(--mono); font-size:.88em; }
+
+.head-meta { display:flex; flex-wrap:wrap; gap:8px; margin-top:20px; }
+.tag { font-family:var(--mono); font-size:11px; padding:5px 10px; border-radius:999px;
+  border:1px solid var(--page-line); background:var(--page-surface); color:var(--page-muted); }
+.tag.on { color:var(--page-accent); border-color:color-mix(in srgb, var(--page-accent) 45%, var(--page-line)); }
+.tag.chg { color:var(--page-warn); border-color:color-mix(in srgb, var(--page-warn) 45%, var(--page-line)); }
+
+.step-head { display:flex; align-items:baseline; gap:14px; margin-bottom:14px; flex-wrap:wrap; }
+.step-n { font-family:var(--mono); font-size:12px; font-weight:700; letter-spacing:.1em;
+  color:var(--page-accent); border:1px solid color-mix(in srgb, var(--page-accent) 40%, var(--page-line));
+  border-radius:7px; padding:3px 9px; flex:0 0 auto; }
+.step-sub { color:var(--page-muted); font-size:14px; margin:0 0 18px; max-width:76ch; }
+
+.notes { display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:14px; margin-top:18px; }
+.note { background:var(--page-surface); border:1px solid var(--page-line); border-radius:11px; padding:14px 16px; }
+.note h3 { font-size:12px; font-family:var(--mono); letter-spacing:.09em; text-transform:uppercase;
+  color:var(--page-muted); margin:0 0 7px; }
+.note p { font-size:13.5px; margin:0; color:var(--page-ink); }
+.note.chg { border-color:color-mix(in srgb,var(--page-warn) 45%, var(--page-line));
+  background:color-mix(in srgb,var(--page-warn) 7%, var(--page-surface)); }
+.note.chg h3 { color:var(--page-warn); }
+hr.sep { border:0; border-top:1px solid var(--page-line); margin:0; }
+
+/* ============================ MOCKUP (app) ================================= */
+.as { background:var(--bg); color:var(--ink); font-family:var(--mono); font-size:12.5px; line-height:1.5;
+  border:1px solid var(--page-line); border-radius:13px; overflow:hidden; box-shadow:var(--page-shadow); }
+.as * { box-sizing:border-box; }
+.as button { font-family:inherit; font-size:inherit; cursor:pointer; }
+.as-body { display:grid; grid-template-columns:236px 1fr; min-height:500px; }
+.as-body.solo { grid-template-columns:1fr; }
+
+.as-side { background:var(--surface); border-right:1px solid var(--line); padding:15px 13px;
+  display:flex; flex-direction:column; gap:9px; }
+.as-brand { font-weight:600; letter-spacing:.12em; text-transform:uppercase; font-size:13px; margin-bottom:5px; }
+.as-addproj { background:var(--surface2); color:var(--ink); border:1px solid var(--line); border-radius:8px; padding:7px; }
+.as-proj { text-align:left; background:transparent; border:1px solid transparent; border-radius:8px;
+  padding:8px 9px; color:var(--ink); display:flex; flex-direction:column; gap:2px; }
+.as-proj.on { background:var(--surface2); border-color:var(--accent); }
+.as-proj em { font-style:normal; font-size:10px; color:var(--dim); }
+.as-foot { margin-top:auto; display:flex; flex-direction:column; gap:7px; border-top:1px solid var(--line); padding-top:11px; }
+.as-sysbtn { display:flex; align-items:center; gap:8px; background:var(--surface2); border:1px solid var(--line);
+  color:var(--ink); border-radius:8px; padding:8px 10px; text-align:left; }
+.as-sysbtn:hover { border-color:var(--accent); }
+.as-sysbtn .as-sysc { margin-left:auto; color:var(--muted); font-size:10.5px; }
+
+.as-top { display:flex; align-items:center; gap:13px; padding:12px 18px; border-bottom:1px solid var(--line); flex-wrap:wrap; }
+.as-tabs { display:flex; gap:4px; flex-wrap:wrap; }
+.as-tabs button { background:transparent; border:1px solid var(--line); color:var(--muted); padding:5px 12px; border-radius:7px; }
+.as-tabs button.on { color:var(--ink); border-color:var(--accent); background:var(--surface2); }
+.as-title { margin-left:auto; font-weight:600; color:var(--ink); }
+.as-main { padding:18px; display:flex; flex-direction:column; gap:15px; overflow:hidden; }
+.as-primary { background:var(--accent); color:#0a0d18; border:none; border-radius:7px; padding:7px 14px; font-weight:600; }
+.as-ghost { background:var(--surface2); color:var(--ink); border:1px solid var(--line); border-radius:7px; padding:7px 13px; }
+.as-ghost:hover { border-color:var(--accent); }
+
+.as-label { font-size:9.5px; letter-spacing:.13em; text-transform:uppercase; color:var(--muted); }
+.as-card { background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:14px; }
+.as-muted { color:var(--muted); } .as-dim { color:var(--dim); }
+.as-scroll { overflow-x:auto; }
+.pill { display:inline-flex; align-items:center; gap:5px; font-size:10.5px; padding:2px 8px;
+  border-radius:999px; border:1px solid var(--line); background:var(--surface2); color:var(--muted); }
+.pill.run { color:var(--running); border-color:color-mix(in srgb,var(--running) 45%,var(--line)); }
+.pill.ok  { color:var(--done);    border-color:color-mix(in srgb,var(--done) 45%,var(--line)); }
+.pill.err { color:var(--error);   border-color:color-mix(in srgb,var(--error) 45%,var(--line)); }
+.pill.acc { color:var(--accent);  border-color:color-mix(in srgb,var(--accent) 45%,var(--line)); }
+/* chip báo tốn token — quy ước dùng khắp app */
+.tok { display:inline-flex; align-items:center; gap:4px; font-size:10px; padding:1px 7px; border-radius:999px;
+  color:#0a0d18; background:var(--running); font-weight:600; }
+.tok.free { background:transparent; color:var(--done); border:1px solid color-mix(in srgb,var(--done) 45%,var(--line)); font-weight:400; }
+/* dưới ngưỡng 50K — vẫn hiện ước tính nhưng chạy thẳng, không hỏi */
+.tok.lo { background:transparent; color:var(--muted); border:1px solid var(--line); font-weight:400; }
+.bar { height:5px; border-radius:3px; background:var(--surface2); overflow:hidden; }
+.bar > i { display:block; height:100%; border-radius:3px; background:var(--accent); }
+.num { font-variant-numeric:tabular-nums; }
+/* thuật ngữ chuẩn giữ nguyên tiếng Anh — rê chuột để xem giải thích */
+.tt { border-bottom:1px dotted var(--dim); cursor:help; text-decoration:none; }
+.tt:hover { border-bottom-color:var(--accent); }
+
+/* job board */
+.as-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(292px,1fr)); gap:12px; }
+.job { background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:13px;
+  display:flex; flex-direction:column; gap:9px; }
+.job.on { border-color:var(--accent); }
+.job-h { display:flex; align-items:flex-start; gap:10px; }
+.ring { --p:0; flex:0 0 auto; width:38px; height:38px; border-radius:50%;
+  background:conic-gradient(var(--accent) calc(var(--p)*1%), var(--surface2) 0); display:grid; place-items:center; }
+.ring::after { content:attr(data-v); width:29px; height:29px; border-radius:50%; background:var(--surface);
+  display:grid; place-items:center; font-size:9.5px; color:var(--ink); font-variant-numeric:tabular-nums; }
+.ring.run { background:conic-gradient(var(--running) calc(var(--p)*1%), var(--surface2) 0); }
+.ring.ok  { background:conic-gradient(var(--done) calc(var(--p)*1%), var(--surface2) 0); }
+.job-t { font-weight:600; }
+.job-std { font-size:10px; color:var(--accent); }
+.job-meta { display:flex; flex-wrap:wrap; gap:5px; }
+.job-files { display:flex; flex-direction:column; gap:3px; border-top:1px solid var(--line); padding-top:8px; }
+.job-file { display:flex; gap:7px; align-items:center; font-size:10.5px; color:var(--muted); }
+.job-file i { font-style:normal; width:11px; }
+.job-file b { font-weight:400; color:var(--ink); flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+/* tables */
+.as-tbl { width:100%; border-collapse:collapse; font-size:11.5px; }
+.as-tbl th { text-align:left; font-weight:600; color:var(--muted); font-size:9.5px; letter-spacing:.11em;
+  text-transform:uppercase; padding:7px 9px; border-bottom:1px solid var(--line); white-space:nowrap; }
+.as-tbl td { padding:8px 9px; border-bottom:1px solid var(--line); vertical-align:top; }
+.as-tbl tr:last-child td { border-bottom:none; }
+.as-tbl td.num, .as-tbl th.num { text-align:right; font-variant-numeric:tabular-nums; }
+
+/* wizard */
+.wz-steps { display:flex; gap:6px; flex-wrap:wrap; }
+.wz-steps button { background:var(--surface); border:1px solid var(--line); color:var(--muted);
+  border-radius:8px; padding:7px 12px; display:flex; align-items:center; gap:7px; }
+.wz-steps button.on { color:var(--ink); border-color:var(--accent); background:var(--surface2); }
+.wz-steps b { color:var(--dim); font-weight:600; }
+.wz-steps button.on b { color:var(--accent); }
+.wz-pane { display:none; flex-direction:column; gap:14px; }
+.wz-pane.on { display:flex; }
+.field { display:flex; flex-direction:column; gap:6px; }
+.inp { background:var(--surface2); border:1px solid var(--line); color:var(--ink); border-radius:7px;
+  padding:7px 10px; font-family:var(--mono); font-size:11.5px; }
+.inp.ph { color:var(--dim); }
+.row { display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; }
+.row > .field { flex:1 1 190px; }
+.chk { display:flex; align-items:flex-start; gap:8px; padding:8px 10px; border:1px solid var(--line);
+  border-radius:8px; background:var(--surface); }
+.chk.on { border-color:color-mix(in srgb,var(--accent) 50%,var(--line)); background:var(--surface2); }
+.chk .bx { flex:0 0 auto; width:14px; height:14px; border-radius:4px; border:1px solid var(--dim);
+  display:grid; place-items:center; font-size:9px; color:var(--bg); margin-top:2px; }
+.chk.on .bx { background:var(--accent); border-color:var(--accent); }
+.chk .bx.radio { border-radius:50%; }
+.chk-t { display:flex; flex-direction:column; gap:3px; }
+.chk-t b { font-weight:600; }
+.chk-t span { color:var(--muted); font-size:10.5px; }
+.opt-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(215px,1fr)); gap:9px; }
+.sample { background:var(--bg); border:1px dashed var(--line); border-radius:7px; padding:7px 9px;
+  font-size:10.5px; color:var(--muted); line-height:1.55; }
+.locked { border-left:2px solid var(--accent); }
+
+/* xem trước front matter */
+.fm { display:grid; grid-template-columns:190px 1fr; gap:12px; }
+.fm-page { background:#fbfbfd; color:#1a1a1a; border-radius:5px; padding:14px 12px; font-family:var(--mono);
+  display:flex; flex-direction:column; gap:5px; box-shadow:0 5px 16px rgba(0,0,0,.4); }
+.fm-page .t1 { font-size:15px; font-weight:700; color:#1F4E79; text-align:center; margin-bottom:4px; }
+.fm-page .t2 { font-size:8.5px; text-align:center; color:#444; }
+.fm-page .hh { font-size:9px; font-weight:700; color:#1F4E79; margin-top:6px; }
+.fm-page .rw { display:flex; font-size:7.5px; border-top:1px solid #d8dde6; padding:2px 0; }
+.fm-page .rw span:first-child { width:64px; color:#555; }
+.fm-page .rw b { font-weight:600; }
+.fm-page .ft { margin-top:auto; font-size:6.5px; color:#888; text-align:center; border-top:1px solid #d8dde6; padding-top:4px; }
+.fm-map { display:flex; flex-direction:column; gap:5px; font-size:11px; }
+.fm-map div { display:flex; gap:8px; }
+.fm-map i { font-style:normal; color:var(--accent); width:14px; }
+
+/* outline tree */
+.tree { display:flex; flex-direction:column; }
+.tr { display:flex; align-items:center; gap:9px; padding:6px 8px; border-radius:7px; }
+.tr:hover { background:var(--surface2); }
+.tr .grip { color:var(--dim); cursor:grab; }
+.tr .nm { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.tr .src { font-size:10px; color:var(--dim); white-space:nowrap; }
+.tr.l1 { padding-left:8px; font-weight:600; }
+.tr.l2 { padding-left:30px; }
+.tr.l3 { padding-left:52px; color:var(--muted); }
+.tr.new { background:color-mix(in srgb,var(--done) 10%,transparent); }
+.tr.drop { background:color-mix(in srgb,var(--error) 9%,transparent); }
+.tr.drop .nm { text-decoration:line-through; color:var(--muted); }
+
+/* progress */
+.view-sw { display:flex; gap:4px; margin-left:auto; }
+.view-sw button { background:var(--surface); border:1px solid var(--line); color:var(--muted); border-radius:7px; padding:5px 10px; }
+.view-sw button.on { color:var(--ink); border-color:var(--accent); background:var(--surface2); }
+.vw { display:none; } .vw.on { display:block; }
+.p3 { display:grid; grid-template-columns:250px 1fr 218px; gap:12px; min-height:344px; }
+.p3 > div { background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:12px; overflow:auto; }
+.st { display:flex; align-items:center; gap:8px; padding:4px 6px; border-radius:6px; font-size:11.5px; }
+.st .ic { width:14px; flex:0 0 auto; text-align:center; }
+.st.d { color:var(--ink); } .st.d .ic { color:var(--done); }
+.st.w { color:var(--ink); background:color-mix(in srgb,var(--running) 12%,transparent); }
+.st.w .ic { color:var(--running); }
+.st.p { color:var(--muted); } .st.p .ic { color:var(--dim); }
+.st.e { color:var(--ink); } .st.e .ic { color:var(--error); }
+.st.sub { padding-left:20px; font-size:11px; }
+.write { background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:11px 12px; line-height:1.62; }
+.write h4 { margin:0 0 7px; font-size:12.5px; color:var(--accent); font-weight:600; }
+.write p { margin:0 0 8px; color:var(--ink); max-width:none; font-size:11.5px; }
+.caret { display:inline-block; width:7px; height:13px; background:var(--running); vertical-align:-2px;
+  animation:blink 1.05s steps(2,start) infinite; }
+@keyframes blink { 50% { opacity:0; } }
+.feed { display:flex; flex-direction:column; gap:4px; font-size:11px; color:var(--muted); }
+.feed span { color:var(--dim); }
+.stat { display:flex; justify-content:space-between; align-items:baseline; padding:5px 0; font-size:11.5px; }
+.stat b { font-weight:600; font-variant-numeric:tabular-nums; }
+.mini { display:flex; flex-direction:column; gap:5px; }
+.mini-row { display:grid; grid-template-columns:62px 1fr 28px; gap:7px; align-items:center; font-size:10.5px; color:var(--muted); }
+
+/* ma trận — full width */
+.hm { border-collapse:separate; border-spacing:3px; font-size:11px; width:100%; table-layout:fixed; }
+.hm th { color:var(--muted); font-size:10px; font-weight:500; padding:0 2px; text-align:center; }
+.hm th.rowh { text-align:left; color:var(--ink); padding-right:8px; white-space:nowrap; width:172px; }
+.hm th.pct { width:52px; }
+.hm td { height:26px; border-radius:5px; background:var(--surface2); text-align:center; color:var(--dim); font-size:10px; }
+.hm td.d { background:color-mix(in srgb,var(--done) 62%, var(--surface2)); color:#08130d; }
+.hm td.w { background:color-mix(in srgb,var(--running) 62%, var(--surface2)); color:#1a1000; }
+.hm td.e { background:color-mix(in srgb,var(--error) 58%, var(--surface2)); color:#1a0505; }
+.hm td.x { background:transparent; }
+.hm td.pctv { background:none; font-variant-numeric:tabular-nums; }
+.legend { display:flex; gap:14px; flex-wrap:wrap; font-size:10.5px; color:var(--muted); margin-top:10px; }
+.legend i { display:inline-block; width:11px; height:11px; border-radius:3px; vertical-align:-1px; margin-right:5px; }
+
+/* score */
+.score-h { display:flex; align-items:center; gap:18px; flex-wrap:wrap; }
+.big { font-size:38px; font-weight:600; font-variant-numeric:tabular-nums; line-height:1; }
+.crit { display:grid; grid-template-columns:170px 44px 1fr 40px; gap:9px; align-items:center; font-size:11.5px; }
+.crit .wgt { background:var(--surface2); border:1px solid var(--line); border-radius:5px; text-align:center;
+  color:var(--accent); font-size:10.5px; padding:1px 0; font-variant-numeric:tabular-nums; }
+.crit .bar > i.ok { background:var(--done); } .crit .bar > i.warn { background:var(--running); }
+.crit .bar > i.bad { background:var(--error); }
+
+/* lint */
+.find { display:grid; grid-template-columns:82px 1fr auto; gap:11px; padding:10px; border:1px solid var(--line);
+  border-radius:9px; background:var(--surface); align-items:center; }
+.find.hi { border-left:2px solid var(--error); }
+.find.md { border-left:2px solid var(--running); }
+.find.lo { border-left:2px solid var(--dim); }
+.find code { background:var(--surface2); border-radius:4px; padding:1px 5px; color:var(--ink); }
+.find .why { color:var(--muted); font-size:10.5px; }
+.mini-btn { background:var(--surface2); border:1px solid var(--line); color:var(--muted); border-radius:6px;
+  padding:4px 9px; font-size:10.5px; }
+.mini-btn:hover { border-color:var(--accent); color:var(--ink); }
+
+/* artifacts */
+.art { display:flex; align-items:center; gap:11px; padding:10px 12px; border:1px solid var(--line);
+  border-radius:9px; background:var(--surface); }
+.art .nm { flex:1; min-width:0; }
+.art .nm em { font-style:normal; display:block; font-size:10px; color:var(--dim); }
+
+/* dialog */
+.dlg-shell { position:relative; background:var(--bg); padding:24px; display:grid; place-items:center; min-height:330px; }
+.dlg { width:min(430px,100%); background:var(--surface); border:1px solid var(--accent); border-radius:12px;
+  padding:17px; display:flex; flex-direction:column; gap:12px; box-shadow:0 22px 60px rgba(0,0,0,.6); }
+.dlg h4 { margin:0; font-size:13.5px; }
+
+/* modal cài đặt — bố cục kiểu claude.ai/settings */
+.set-shell { background:rgba(6,8,13,.72); padding:26px; display:grid; place-items:center; }
+.set { width:100%; display:grid; grid-template-columns:210px 1fr; min-height:452px;
+  background:var(--surface); border:1px solid var(--line); border-radius:14px; overflow:hidden;
+  box-shadow:0 26px 70px rgba(0,0,0,.62); }
+.set-nav { background:var(--bg); border-right:1px solid var(--line); padding:14px 11px;
+  display:flex; flex-direction:column; gap:2px; }
+.set-search { display:flex; align-items:center; gap:7px; background:var(--surface2); border:1px solid var(--line);
+  border-radius:8px; padding:7px 10px; color:var(--dim); margin-bottom:12px; }
+.set-nav button { display:flex; align-items:center; gap:9px; text-align:left; background:transparent;
+  border:none; border-radius:7px; padding:7px 9px; color:var(--muted); }
+.set-nav button:hover { background:var(--surface2); color:var(--ink); }
+.set-nav button.on { background:var(--surface2); color:var(--ink); font-weight:600; }
+.set-nav button i { font-style:normal; width:15px; text-align:center; color:var(--dim); }
+.set-nav button.on i { color:var(--accent); }
+.set-nav .as-label { margin:13px 0 5px; padding-left:9px; }
+.set-body { padding:16px 20px; display:flex; flex-direction:column; gap:13px; overflow:auto; position:relative; }
+.set-x { position:absolute; top:13px; right:15px; background:none; border:none; color:var(--muted); font-size:15px; }
+.set-x:hover { color:var(--ink); }
+.set-h { font-size:14px; font-weight:600; margin-bottom:2px; }
+
+@media (max-width:900px) {
+  .as-body { grid-template-columns:1fr; }
+  .as-side { display:none; }
+  .p3 { grid-template-columns:1fr; }
+  .fm { grid-template-columns:1fr; }
+  .set { grid-template-columns:1fr; }
+  .set-nav { border-right:none; border-bottom:1px solid var(--line); flex-direction:row; flex-wrap:wrap; }
+}
+@media (prefers-reduced-motion: reduce) { .caret { animation:none; } * { transition:none !important; } }
+:focus-visible { outline:2px solid var(--page-accent); outline-offset:2px; border-radius:4px; }
+</style>
+
+<div class="wrap">
+
+  <header>
+    <p class="eyebrow">Agile Studio · mockup v3 · đã chốt, tách thành 8 feature</p>
+    <h1>Tài liệu sản phẩm</h1>
+    <p class="lede">Phân tích project và viết bộ tài liệu sản phẩm theo <b>chuẩn ngành quốc tế</b> —
+      có cổng duyệt dàn ý, theo dõi tiến độ trực tiếp, chấm điểm theo chuẩn, bắt lỗi thuật ngữ,
+      và xuất ra Word / PDF khi cần.</p>
+    <div class="head-meta">
+      <span class="tag on">Tab “📚 Tài liệu” · tab cũ đổi thành “Agile”</span>
+      <span class="tag on">Tài liệu chỉ thuộc về project chứa nó</span>
+      <span class="tag on">Chỉ chuẩn quốc tế · bỏ khung tự chế</span>
+      <span class="tag on">Wizard 3 bước · xuất bản tách ra</span>
+      <span class="tag on">2 kiểu xem tiến độ</span>
+      <span class="tag chg">↻ v3 · Bảng kiểm soát lấy từ mẫu Word</span>
+      <span class="tag chg">↻ v3 · Chỉ hỏi khi việc &gt; 50K token</span>
+      <span class="tag chg">↻ v3 · Cấu hình là modal kiểu claude.ai</span>
+      <span class="tag chg">↻ v3 · Thuật ngữ chuẩn giữ tiếng Anh + tooltip</span>
+    </div>
+    <p class="lede" style="font-size:15px;margin-top:18px">
+      <b>Quy ước thuật ngữ:</b> tên mục và tên tài liệu do chuẩn quy định thì <b>giữ nguyên tiếng Anh</b>
+      (<abbr class="tt" title="Phân rã hệ thống thành các khối lồng nhau theo từng cấp">Building Block View</abbr>,
+      <abbr class="tt" title="ADR — quyết định kiến trúc quan trọng kèm bối cảnh và lý do chọn">Architecture Decisions</abbr>,
+      <abbr class="tt" title="Bộ hạng mục thông tin bắt buộc trong vòng đời phần mềm">Life-cycle Information Items</abbr>…),
+      kèm <b>tooltip giải thích một dòng bằng tiếng Việt</b> — rê chuột vào chữ có gạch chân chấm để xem.
+      Chỉ dịch những từ mà tiếng Việt diễn đạt tự nhiên (phạm vi, tiến độ, mục, nguồn, trọng số).
+    </p>
+  </header>
+
+  <hr class="sep" />
+
+  <!-- ==================== MH1 ==================== -->
+  <section>
+    <div class="step-head"><span class="step-n">MH 1</span><h2>Tab 📚 Tài liệu</h2></div>
+    <p class="step-sub">Mọi bộ tài liệu ở đây <b>đều là tài liệu của chính project đang mở</b> — khác nhau ở
+      <b>chuẩn</b> được áp dụng, không phải khác sản phẩm. Không có màn hình gộp job của nhiều project.
+      Mỗi thẻ ghi rõ <b>bộ này gồm mấy tài liệu</b> và liệt kê tên file.</p>
+
+    <div class="as">
+      <div class="as-body">
+        <aside class="as-side">
+          <div class="as-brand">Agile&nbsp;Studio</div>
+          <button class="as-addproj">+ Project</button>
+          <button class="as-proj on"><span>Acme Portal</span><em>e:\gits\acme-portal</em></button>
+          <button class="as-proj"><span>Billing Service</span><em>e:\gits\billing-svc</em></button>
+          <button class="as-proj"><span>Ops Console</span><em>e:\gits\ops-console</em></button>
+          <div class="as-foot">
+            <div class="as-label">Account</div>
+            <div class="st d"><i class="ic">●</i>minh@… <span class="as-dim">· 32% /5h</span></div>
+            <button class="as-sysbtn">⚙ Cài đặt <span class="as-sysc">● 5/6 kết nối</span></button>
+          </div>
+        </aside>
+
+        <div style="display:flex;flex-direction:column;overflow:hidden">
+          <div class="as-top">
+            <div class="as-tabs">
+              <button>Sessions</button><button>Requirement</button><button>Agile</button>
+              <button>⏰ Lịch</button><button class="on">📚 Tài liệu</button>
+            </div>
+            <button class="as-primary">＋ Bộ tài liệu mới</button>
+            <div class="as-title">Acme Portal</div>
+          </div>
+
+          <div class="as-main">
+            <div class="as-grid">
+              <article class="job on">
+                <div class="job-h">
+                  <div class="ring run" style="--p:62" data-v="62%"></div>
+                  <div><div class="job-t"><abbr class="tt" title="Tài liệu kiến trúc phần mềm theo khung arc42">Software Architecture</abbr></div>
+                    <div class="job-std">arc42 + C4 · v1.0</div></div>
+                </div>
+                <div class="bar"><i style="width:62%;background:var(--running)"></i></div>
+                <div class="job-meta"><span class="pill run">✍️ đang viết §5.3</span><span class="pill">1 tài liệu · 12 mục</span></div>
+                <div class="job-files">
+                  <div class="job-file"><i>📘</i><b>Acme Portal — Software Architecture.docx</b><span class="as-dim">8/12 mục</span></div>
+                </div>
+              </article>
+
+              <article class="job">
+                <div class="job-h">
+                  <div class="ring" style="--p:100" data-v="⏸"></div>
+                  <div><div class="job-t"><abbr class="tt" title="SRS — đặc tả yêu cầu phần mềm theo ISO/IEC/IEEE 29148">Software Requirements Specification</abbr></div>
+                    <div class="job-std">ISO/IEC/IEEE 29148 · v0.1</div></div>
+                </div>
+                <div class="bar"><i style="width:100%;background:var(--accent)"></i></div>
+                <div class="job-meta"><span class="pill acc">⏸ chờ duyệt dàn ý</span><span class="pill">1 tài liệu · 9 mục</span></div>
+                <div class="job-files">
+                  <div class="job-file"><i>📘</i><b>Acme Portal — SRS.docx</b><span class="as-dim">đề xuất</span></div>
+                </div>
+              </article>
+
+              <article class="job">
+                <div class="job-h">
+                  <div class="ring ok" style="--p:100" data-v="✓"></div>
+                  <div><div class="job-t"><abbr class="tt" title="Bộ hạng mục thông tin bắt buộc trong vòng đời phần mềm theo ISO/IEC/IEEE 15289">Life-cycle Information Items</abbr></div>
+                    <div class="job-std">ISO/IEC/IEEE 15289 · v1.2</div></div>
+                </div>
+                <div class="bar"><i style="width:100%;background:var(--done)"></i></div>
+                <div class="job-meta"><span class="pill ok">✓ hoàn tất</span><span class="pill">6 tài liệu · 41 mục</span>
+                  <span class="pill ok">Điểm 91</span></div>
+                <div class="job-files">
+                  <div class="job-file"><i>📘</i><b>Software Design Description</b><span class="pill ok">✓</span></div>
+                  <div class="job-file"><i>📘</i><b>Database Design</b><span class="pill ok">✓</span></div>
+                  <div class="job-file"><i>📘</i><b>Deployment &amp; Installation</b><span class="pill ok">✓</span></div>
+                  <div class="job-file as-dim"><i>▾</i><b>còn 3 tài liệu…</b></div>
+                </div>
+              </article>
+
+              <article class="job">
+                <div class="job-h">
+                  <div class="ring ok" style="--p:100" data-v="✓"></div>
+                  <div><div class="job-t"><abbr class="tt" title="Tài liệu dành cho người dùng cuối và quản trị viên">User Documentation</abbr></div>
+                    <div class="job-std">ISO/IEC/IEEE 26514 + Diátaxis · v1.0</div></div>
+                </div>
+                <div class="bar"><i style="width:100%;background:var(--done)"></i></div>
+                <div class="job-meta"><span class="pill ok">✓ hoàn tất</span><span class="pill">2 tài liệu · 18 mục</span>
+                  <span class="pill err">3 lỗi thuật ngữ</span></div>
+                <div class="job-files">
+                  <div class="job-file"><i>📘</i><b>User Guide</b><span class="pill ok">✓</span></div>
+                  <div class="job-file"><i>📘</i><b>Administrator Guide</b><span class="pill ok">✓</span></div>
+                </div>
+              </article>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="notes">
+      <div class="note chg"><h3>Đã sửa · tên tab</h3><p>Tab mới gọn: <b>📚 Tài liệu</b>. Tab “Tài liệu” cũ
+        (skill tổng + tài liệu PM/BA/DA) đổi thành <b>Agile</b> — đúng nội dung nó chứa và ngắn hơn.</p></div>
+      <div class="note chg"><h3>Đã sửa · phạm vi</h3><p>Thẻ trong project Acme Portal chỉ là tài liệu của Acme Portal.
+        Không có tài liệu của sản phẩm khác lọt vào, và không có bảng job cấp global.</p></div>
+      <div class="note chg"><h3>Đã sửa · một thẻ là gì</h3><p>Một thẻ = <b>một bộ tài liệu theo một chuẩn</b>,
+        chứa 1 hoặc nhiều file. Số file do chuẩn quyết định: arc42 = 1 file, 15289 = 6 file. Thẻ liệt kê tên file.</p></div>
+      <div class="note chg"><h3>Đã sửa · khối Kết nối</h3><p>Thu thành một nút <code>⚙ Cài đặt</code> ở đáy
+        sidebar (kèm chấm trạng thái), mở <b>modal cài đặt</b> đúng ở mục Kết nối — xem MH 8.</p></div>
+    </div>
+  </section>
+
+  <hr class="sep" />
+
+  <!-- ==================== MH2 ==================== -->
+  <section>
+    <div class="step-head"><span class="step-n">MH 2</span><h2>Trình tạo bộ tài liệu — 3 bước</h2></div>
+    <p class="step-sub">Bấm vào từng bước để xem. “Xuất bản” đã bỏ khỏi wizard — nội dung lưu trong Agile Studio,
+      chỉ chọn nơi lưu <i>khi xuất</i> (MH 7). “Cách chạy” cũng chuyển sang lúc duyệt dàn ý (MH 3).</p>
+
+    <div class="as">
+      <div class="as-body solo">
+        <div style="display:flex;flex-direction:column">
+          <div class="as-top">
+            <b>＋ Bộ tài liệu mới</b><span class="pill">Acme Portal</span>
+            <div class="as-title as-dim">✕</div>
+          </div>
+          <div class="as-main">
+            <div class="wz-steps" role="tablist">
+              <button class="on" data-wz="1" role="tab" aria-selected="true"><b>1</b> Phạm vi &amp; nguồn</button>
+              <button data-wz="2" role="tab" aria-selected="false"><b>2</b> Bộ tài liệu</button>
+              <button data-wz="3" role="tab" aria-selected="false"><b>3</b> Trình bày &amp; văn phong</button>
+            </div>
+
+            <!-- bước 1 -->
+            <div class="wz-pane on" id="wz1">
+              <div class="field">
+                <span class="as-label">Nguồn</span>
+                <div class="as-card locked" style="display:flex;align-items:center;gap:11px">
+                  <span class="pill acc">nguồn chính</span>
+                  <div style="flex:1"><b>Acme Portal</b>
+                    <div class="as-dim" style="font-size:10.5px">e:\gits\acme-portal · Node 22 + TypeScript · 412 file</div></div>
+                  <span class="as-dim">🔒 không đổi được</span>
+                </div>
+                <div class="as-card" style="display:flex;align-items:center;gap:11px;margin-top:7px">
+                  <span class="pill">tham chiếu</span>
+                  <div style="flex:1"><b>Tài liệu &amp; HDSD sẵn có</b>
+                    <div class="as-dim" style="font-size:10.5px">6 tệp .docx · trích được 41 ảnh minh hoạ</div></div>
+                  <button class="mini-btn">Sửa</button><button class="mini-btn">Bỏ</button>
+                </div>
+                <div class="row" style="margin-top:8px">
+                  <button class="as-ghost">＋ Thư mục mã nguồn của sản phẩm này…</button>
+                  <button class="as-ghost">＋ Tài liệu tham chiếu…</button>
+                </div>
+                <p class="sample">Nguồn chính luôn là repo của project đang mở. Chỉ thêm được thư mục
+                  <b>thuộc cùng sản phẩm</b> (ví dụ repo frontend nằm ngoài thư mục gốc) và tài liệu tham chiếu.
+                  Không lấy mã nguồn của project khác.</p>
+              </div>
+
+              <div class="as-card">
+                <div class="as-label" style="margin-bottom:9px">Phạm vi nội dung</div>
+                <div class="opt-grid">
+                  <div class="chk on"><i class="bx radio">●</i><span class="chk-t"><b>Toàn bộ sản phẩm</b><span>Mọi thư mục trong phạm vi nguồn</span></span></div>
+                  <div class="chk"><i class="bx radio"></i><span class="chk-t"><b>Theo feature</b><span>Đọc tài liệu agile của project, hoặc tải lên tài liệu riêng</span></span></div>
+                </div>
+                <div style="border-top:1px solid var(--line);margin:12px 0 10px"></div>
+                <div class="chk on" style="align-items:center"><i class="bx">✓</i>
+                  <span class="chk-t"><b>Chỉ phần đóng góp của tác giả (git)</b>
+                    <span>Bỏ chọn = viết cho đóng góp của mọi contributor</span></span></div>
+                <div class="row" style="margin-top:11px">
+                  <div class="field" style="flex:2 1 330px">
+                    <span class="as-label">Tác giả (git) — gom mọi identity</span>
+                    <div class="row" style="gap:5px">
+                      <span class="pill acc">Nguyễn An ✕</span><span class="pill acc">nguyenan ✕</span>
+                      <span class="pill acc">10293847+NguyenAn ✕</span><span class="pill acc">an.nguyen@example.com ✕</span>
+                      <button class="mini-btn">＋ thêm</button>
+                    </div>
+                  </div>
+                  <div class="field"><span class="as-label">Từ ngày</span><input class="inp" value="2024-01-01" readonly /></div>
+                  <div class="field"><span class="as-label">Đến ngày</span><input class="inp ph" value="(nay)" readonly /></div>
+                </div>
+                <div class="sample" style="margin-top:10px">
+                  <b style="color:var(--ink)">Xem trước:</b> 51/52 commit · 17 thư mục · 412 file.
+                  Thư mục có &lt; 3 commit của tác giả sẽ vào <i>phụ lục</i> thay vì mục chính.
+                </div>
+              </div>
+            </div>
+
+            <!-- bước 2 -->
+            <div class="wz-pane" id="wz2">
+              <div class="field">
+                <span class="as-label">Chuẩn áp dụng — quyết định bộ tài liệu gồm những file nào</span>
+                <div class="opt-grid">
+                  <div class="chk on"><i class="bx radio">●</i><span class="chk-t"><b>arc42 + C4</b>
+                    <span>Software Architecture · <b>1 file</b> · 12 mục</span></span></div>
+                  <div class="chk"><i class="bx radio"></i><span class="chk-t"><b>ISO/IEC/IEEE 29148</b>
+                    <span>Software Requirements Specification · <b>1 file</b> · 9 mục</span></span></div>
+                  <div class="chk"><i class="bx radio"></i><span class="chk-t"><b>IEEE 1016 + ISO 42010</b>
+                    <span>Software Design Description · <b>1 file</b> · 11 mục</span></span></div>
+                  <div class="chk"><i class="bx radio"></i><span class="chk-t"><b>ISO/IEC/IEEE 26514</b>
+                    <span>User Documentation · <b>2 file</b> · 18 mục</span></span></div>
+                  <div class="chk"><i class="bx radio"></i><span class="chk-t"><b>ISO/IEC/IEEE 15289</b>
+                    <span>Life-cycle Information Items · <b>6 file</b> · 41 mục</span></span></div>
+                  <div class="chk"><i class="bx radio"></i><span class="chk-t"><b>Tuỳ chọn</b>
+                    <span>Tự ghép tài liệu từ các chuẩn trên</span></span></div>
+                </div>
+              </div>
+              <div class="as-scroll">
+                <table class="as-tbl">
+                  <thead><tr><th style="width:26px"></th><th>Mục theo arc42</th><th>Loại nội dung <abbr class="tt" title="Phân loại theo Diátaxis — quyết định văn phong của mục">(Diátaxis)</abbr></th><th>Nguồn dữ liệu</th></tr></thead>
+                  <tbody>
+                    <tr><td>☑</td><td>1. <abbr class="tt" title="Bài toán cần giải, mục tiêu chất lượng, các bên liên quan">Introduction and Goals</abbr></td><td><abbr class="tt" title="Giải thích: vì sao lại thế — dành cho người muốn hiểu bối cảnh">explanation</abbr></td><td>Tài liệu agile · README</td></tr>
+                    <tr><td>☑</td><td>2. <abbr class="tt" title="Ràng buộc kỹ thuật và tổ chức mà thiết kế phải tuân theo">Constraints</abbr></td><td><abbr class="tt" title="Tra cứu: nó là gì, giá trị bao nhiêu, ở đâu — viết súc tích">reference</abbr></td><td>Cấu hình · phụ thuộc</td></tr>
+                    <tr><td>☑</td><td>3. <abbr class="tt" title="Hệ thống nằm ở đâu, trao đổi gì với hệ thống và người dùng bên ngoài">Context and Scope</abbr></td><td><abbr class="tt" title="Giải thích: vì sao lại thế — dành cho người muốn hiểu bối cảnh">explanation</abbr></td><td>Tích hợp ngoài</td></tr>
+                    <tr><td>☑</td><td>4. <abbr class="tt" title="Các quyết định nền tảng: công nghệ, cách phân rã, cách đạt mục tiêu chất lượng">Solution Strategy</abbr></td><td><abbr class="tt" title="Giải thích: vì sao lại thế — dành cho người muốn hiểu bối cảnh">explanation</abbr></td><td>Kiến trúc mã nguồn</td></tr>
+                    <tr><td>☑</td><td>5. <abbr class="tt" title="Phân rã hệ thống thành các khối lồng nhau theo từng cấp">Building Block View</abbr></td><td><abbr class="tt" title="Tra cứu: nó là gì, giá trị bao nhiêu, ở đâu — viết súc tích">reference</abbr></td><td>Cấu trúc project</td></tr>
+                    <tr><td>☑</td><td>6. <abbr class="tt" title="Các thành phần phối hợp với nhau ra sao khi chạy một kịch bản cụ thể">Runtime View</abbr></td><td><abbr class="tt" title="Tra cứu: nó là gì, giá trị bao nhiêu, ở đâu — viết súc tích">reference</abbr></td><td>Controller · job nền</td></tr>
+                    <tr><td>☑</td><td>7. <abbr class="tt" title="Phần mềm chạy trên hạ tầng nào, ánh xạ khối vào máy chủ/container">Deployment View</abbr></td><td><abbr class="tt" title="Tra cứu: nó là gì, giá trị bao nhiêu, ở đâu — viết súc tích">reference</abbr></td><td>Docker · CI · cấu hình</td></tr>
+                    <tr><td>☑</td><td>8. <abbr class="tt" title="Chủ đề áp cho toàn hệ thống: xác thực, ghi log, đa ngôn ngữ, xử lý lỗi">Cross-cutting Concepts</abbr></td><td><abbr class="tt" title="Giải thích: vì sao lại thế — dành cho người muốn hiểu bối cảnh">explanation</abbr></td><td>Xác thực · log · i18n</td></tr>
+                    <tr><td>☑</td><td>9. <abbr class="tt" title="ADR — quyết định kiến trúc quan trọng kèm bối cảnh và lý do chọn">Architecture Decisions</abbr></td><td><abbr class="tt" title="Giải thích: vì sao lại thế — dành cho người muốn hiểu bối cảnh">explanation</abbr></td><td>Lịch sử git · tài liệu DA</td></tr>
+                    <tr><td>☑</td><td>10. <abbr class="tt" title="Kịch bản chất lượng đo được, phân loại theo ISO/IEC 25010">Quality Requirements</abbr></td><td><abbr class="tt" title="Tra cứu: nó là gì, giá trị bao nhiêu, ở đâu — viết súc tích">reference</abbr></td><td>Cấu hình · SLA</td></tr>
+                    <tr><td>☑</td><td>11. <abbr class="tt" title="Rủi ro đã biết và technical debt đang gánh">Risks and Technical Debt</abbr></td><td><abbr class="tt" title="Giải thích: vì sao lại thế — dành cho người muốn hiểu bối cảnh">explanation</abbr></td><td>TODO · cảnh báo build</td></tr>
+                    <tr><td>☑</td><td>12. <abbr class="tt" title="Thuật ngữ chuẩn dùng thống nhất xuyên suốt bộ tài liệu">Glossary</abbr></td><td><abbr class="tt" title="Tra cứu: nó là gì, giá trị bao nhiêu, ở đâu — viết súc tích">reference</abbr></td><td>Toàn bộ mã nguồn</td></tr>
+                  </tbody>
+                </table>
+              </div>
+              <div class="as-card">
+                <div class="as-label" style="margin-bottom:9px">Lịch sử phiên bản — ghi vào bảng “Kiểm soát tài liệu”</div>
+                <div class="as-scroll">
+                  <table class="as-tbl">
+                    <thead><tr><th>Ngày</th><th>Phiên bản</th><th>Thay đổi</th><th>Người sửa</th></tr></thead>
+                    <tbody>
+                      <tr><td>29/07/2026</td><td>1.0</td><td>Khởi tạo</td><td>Nguyễn An</td></tr>
+                      <tr><td colspan="4" class="as-dim">Mỗi lần dựng lại, một dòng mới được thêm tự động từ
+                        khác biệt nội dung — ví dụ “§6 thêm 2 luồng; §10 cập nhật 4 chỉ tiêu”. Sửa tay được.</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <div class="as-card">
+                <div class="row" style="align-items:center;margin-bottom:10px">
+                  <div class="as-label">Bảng “Kiểm soát tài liệu” — thông tin đầu tài liệu</div>
+                  <span class="pill ok" style="margin-left:auto">✓ Mẫu Word đã có sẵn bảng này → dùng luôn</span>
+                </div>
+                <p class="sample" style="margin-bottom:11px">Studio dò trong mẫu Word thấy bảng kiểm soát có
+                  <b>6 dòng</b>. Nó <b>giữ nguyên bố cục và style của mẫu</b>, chỉ điền giá trị vào. Hai dòng
+                  chuẩn không có trong mẫu được <b>đề xuất bổ sung</b> — bỏ chọn nếu không muốn.</p>
+                <div class="fm">
+                  <div class="fm-page">
+                    <div class="t1">ACME PORTAL</div>
+                    <div class="t2">Tài liệu kiến trúc phần mềm</div>
+                    <div class="t2">arc42 + C4 · Phiên bản 1.0</div>
+                    <div class="hh">Kiểm soát tài liệu</div>
+                    <div class="rw"><span>Tên tài liệu</span><b>Software Architecture</b></div>
+                    <div class="rw"><span>Mã tài liệu</span><b>AP-SAD-01</b></div>
+                    <div class="rw"><span>Chủ sở hữu</span><b>Nguyễn An</b></div>
+                    <div class="rw"><span>Ngày tạo</span><b>29/07/2026</b></div>
+                    <div class="rw"><span>Phiên bản</span><b>1.0</b></div>
+                    <div class="rw"><span>Phân loại</span><b>Nội bộ</b></div>
+                    <div class="ft">NỘI BỘ — KHÔNG PHÁT TÁN | Trang 1</div>
+                  </div>
+                  <div>
+                    <table class="as-tbl">
+                      <thead><tr><th style="width:24px"></th><th>Dòng</th><th>Nguồn</th><th>Giá trị</th></tr></thead>
+                      <tbody>
+                        <tr><td>☑</td><td>Tên tài liệu</td><td><span class="pill ok">có trong mẫu</span></td><td>theo chuẩn đã chọn</td></tr>
+                        <tr><td>☑</td><td>Mã tài liệu</td><td><span class="pill ok">có trong mẫu</span></td><td><code>AP-SAD-01</code> · tự sinh, sửa được</td></tr>
+                        <tr><td>☑</td><td>Chủ sở hữu</td><td><span class="pill ok">có trong mẫu</span></td><td>Nguyễn An</td></tr>
+                        <tr><td>☑</td><td>Ngày tạo</td><td><span class="pill ok">có trong mẫu</span></td><td>ngày duyệt dàn ý</td></tr>
+                        <tr><td>☑</td><td>Phiên bản</td><td><span class="pill ok">có trong mẫu</span></td><td>dòng cuối bảng lịch sử</td></tr>
+                        <tr><td>☑</td><td>Phân loại</td><td><span class="pill ok">có trong mẫu</span></td><td>Nội bộ ▾ <span class="as-dim">cũng in ở chân trang</span></td></tr>
+                        <tr><td>☑</td><td>Trạng thái</td><td><span class="pill acc">＋ đề xuất thêm</span></td><td>Bản nháp → Chờ duyệt → Ban hành</td></tr>
+                        <tr><td>☐</td><td>Trang phê duyệt</td><td><span class="pill acc">＋ đề xuất thêm</span></td><td>bảng ký của hai bên</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+                <p class="sample" style="margin-top:10px"><b style="color:var(--ink)">Nếu mẫu không có bảng này:</b>
+                  Studio báo “không tìm thấy bảng kiểm soát trong mẫu” và dựng một bảng mới theo style bảng của
+                  chính mẫu đó — bạn chọn dòng nào cần.</p>
+              </div>
+            </div>
+
+            <!-- bước 3 -->
+            <div class="wz-pane" id="wz3">
+              <div class="row">
+                <div class="field" style="flex:2 1 340px">
+                  <span class="as-label">Mẫu Word — mặc định lấy từ cấu hình toàn cục, đè riêng cho bộ này nếu cần</span>
+                  <div class="row" style="gap:7px">
+                    <input class="inp" style="flex:1" value="Mẫu tài liệu kỹ thuật v3.docx" readonly />
+                    <span class="pill">kế thừa toàn cục</span>
+                    <button class="as-ghost">Đổi cho bộ này…</button>
+                  </div>
+                </div>
+              </div>
+              <div class="as-card">
+                <div class="as-label" style="margin-bottom:8px">Style đọc được từ mẫu — nội dung sẽ ánh xạ vào đây</div>
+                <div class="as-scroll">
+                  <table class="as-tbl">
+                    <thead><tr><th>Style trong mẫu</th><th>Font</th><th>Cỡ</th><th>Màu</th><th>Dùng cho</th></tr></thead>
+                    <tbody>
+                      <tr><td>Normal</td><td>Calibri</td><td class="num">11.5pt</td><td>#1A1A1A</td><td>Đoạn văn</td></tr>
+                      <tr><td>Heading 1</td><td>Calibri</td><td class="num">17pt</td><td>#1F4E79</td><td>Mục cấp 1</td></tr>
+                      <tr><td>Heading 2</td><td>Calibri</td><td class="num">13.5pt</td><td>#1F4E79</td><td>Mục cấp 2</td></tr>
+                      <tr><td>Heading 3 / 4</td><td>Calibri</td><td class="num">12 / 11.5pt</td><td>#1F4E79</td><td>Mục cấp 3, 4</td></tr>
+                      <tr><td>Table Grid</td><td>Calibri</td><td class="num">9.5pt</td><td>header #1F4E79 · zebra #F2F5F9</td><td>Mọi bảng</td></tr>
+                      <tr><td><span class="pill err">thiếu</span> Code</td><td colspan="4" class="as-muted">Mẫu không có style mã nguồn → dùng dự phòng Consolas 9pt nền #F3F3F3</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <div class="field">
+                <span class="as-label">Văn phong</span>
+                <div class="opt-grid">
+                  <div class="chk on"><i class="bx radio">●</i><span class="chk-t"><b>Định danh · súc tích</b>
+                    <span class="sample">“<code>ConnectionStrings:Main</code> — chuỗi kết nối SQL Server, khai báo trong <code>appsettings.json</code>.”</span></span></div>
+                  <div class="chk"><i class="bx radio"></i><span class="chk-t"><b>Hàn lâm</b>
+                    <span class="sample">“Tham số kết nối được định nghĩa theo mô hình cấu hình phân tầng, bảo đảm tách biệt mã nguồn và tham số môi trường.”</span></span></div>
+                  <div class="chk"><i class="bx radio"></i><span class="chk-t"><b>Diễn giải chi tiết</b>
+                    <span class="sample">“Khoá này quyết định ứng dụng nối tới đâu. Khi đổi máy chủ, sửa giá trị rồi khởi động lại service…”</span></span></div>
+                  <div class="chk"><i class="bx radio"></i><span class="chk-t"><b>Kể chuyện · dẫn dắt</b>
+                    <span class="sample">“Trước khi bàn tới chuyện kết nối, cần hiểu vì sao hệ thống tách cấu hình ra khỏi mã nguồn…”</span></span></div>
+                </div>
+                <p class="sample">Văn phong áp theo <b>loại nội dung</b>: mục <code>reference</code> luôn súc tích,
+                  mục <code>howto</code> luôn đánh số bước — lựa chọn ở đây chi phối phần <code>explanation</code>.</p>
+              </div>
+              <div class="row">
+                <div class="field"><span class="as-label">Ngôn ngữ</span><input class="inp" value="Tiếng Việt · giữ thuật ngữ EN" readonly /></div>
+                <div class="field"><span class="as-label">Độ sâu</span><input class="inp" value="Chi tiết tới từng luồng nghiệp vụ" readonly /></div>
+                <button class="as-ghost">Quay lại</button>
+                <button class="as-primary">Khảo sát &amp; đề xuất dàn ý <span class="tok">⛽ ~180K</span></button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="notes">
+      <div class="note chg"><h3>Đã sửa · nguồn</h3><p>Nguồn chính = project hiện tại, khoá lại. Bỏ nút
+        “＋ Từ project có sẵn”. Chỉ còn thêm thư mục cùng sản phẩm và tài liệu tham chiếu.</p></div>
+      <div class="note chg"><h3>Đã sửa · phạm vi</h3><p>Bỏ “Theo thư mục con”. “Theo đóng góp (git)” tách
+        thành ô tích riêng, kết hợp được với “Toàn bộ” — hoặc bỏ tích để viết cho mọi contributor.</p></div>
+      <div class="note chg"><h3>Đã sửa · bộ khung</h3><p>Bỏ bộ tự chế 7 file. Chỉ còn chuẩn quốc tế; chuẩn
+        quyết định số file. Bảng mục hiện luôn nội dung và nguồn dữ liệu của từng mục.</p></div>
+      <div class="note chg"><h3>Đã sửa · phiên bản</h3><p>Thay ô nhập rời bằng <b>bảng lịch sử phiên bản</b>
+        có ghi chú thay đổi, tự thêm dòng mỗi lần dựng lại.</p></div>
+      <div class="note chg"><h3>v3 · bảng kiểm soát</h3><p>Bỏ chữ “siêu dữ liệu”. Studio <b>dò bảng Kiểm soát
+        tài liệu có sẵn trong mẫu Word</b> và điền vào, giữ nguyên bố cục của mẫu; chỉ đề xuất bổ sung dòng
+        còn thiếu. Mẫu không có bảng thì mới dựng mới.</p></div>
+    </div>
+  </section>
+
+  <hr class="sep" />
+
+  <!-- ==================== MH3 ==================== -->
+  <section>
+    <div class="step-head"><span class="step-n">MH 3</span><h2>Chốt dàn ý — cổng duyệt trước khi viết</h2></div>
+    <p class="step-sub">Agent khảo sát mã nguồn thật rồi đề xuất dàn ý; job dừng chờ bạn. <b>Cách chạy</b> chọn
+      ở đây (và đổi được giữa chừng ở MH 4). Dàn ý duyệt xong lưu được thành <b>preset toàn cục</b>.</p>
+
+    <div class="as">
+      <div class="as-body solo">
+        <div style="display:flex;flex-direction:column">
+          <div class="as-top">
+            <b>Kiến trúc phần mềm · arc42 + C4</b>
+            <span class="pill acc">⏸ chờ duyệt dàn ý</span><span class="pill">1 tài liệu · 12 mục</span>
+            <div class="as-title as-dim">khảo sát 4′12″ · 180K tok</div>
+          </div>
+          <div class="as-main">
+            <div style="display:grid;grid-template-columns:1fr 300px;gap:12px" class="ol-grid">
+              <div class="as-card" style="max-height:392px;overflow:auto">
+                <div class="row" style="margin-bottom:9px">
+                  <button class="mini-btn">＋ Thêm mục</button>
+                  <button class="mini-btn">Áp preset…</button>
+                  <button class="mini-btn">💾 Lưu dàn ý này thành preset</button>
+                </div>
+                <div class="tree">
+                  <div class="tr l1"><span class="grip">⠿</span><span>☑</span><span class="nm">📘 Acme Portal — Software Architecture.docx</span><span class="src">12 mục</span></div>
+                  <div class="tr l2"><span class="grip">⠿</span><span>☑</span><span class="nm">1. <abbr class="tt" title="Bài toán cần giải, mục tiêu chất lượng, các bên liên quan">Introduction and Goals</abbr></span><span class="src">tài liệu agile · PM</span></div>
+                  <div class="tr l2"><span class="grip">⠿</span><span>☑</span><span class="nm">2. <abbr class="tt" title="Ràng buộc kỹ thuật và tổ chức mà thiết kế phải tuân theo">Constraints</abbr></span><span class="src">Directory.Packages.props</span></div>
+                  <div class="tr l2"><span class="grip">⠿</span><span>☑</span><span class="nm">3. <abbr class="tt" title="Hệ thống nằm ở đâu, trao đổi gì với bên ngoài">Context and Scope</abbr></span><span class="src">6 tích hợp ngoài</span></div>
+                  <div class="tr l2"><span class="grip">⠿</span><span>☑</span><span class="nm">5. <abbr class="tt" title="Phân rã hệ thống thành các khối lồng nhau">Building Block View</abbr></span><span class="src">9 project · 4 tầng</span></div>
+                  <div class="tr l2"><span class="grip">⠿</span><span>☑</span><span class="nm">6. <abbr class="tt" title="Các thành phần phối hợp ra sao khi chạy một kịch bản">Runtime View</abbr> <span class="pill">11 luồng</span></span><span class="src">11 route handler</span></div>
+                  <div class="tr l3"><span>☑</span><span class="nm">6.1 Xác thực &amp; phân quyền</span><span class="src">Authentications/*</span></div>
+                  <div class="tr l3"><span>☑</span><span class="nm">6.2 Tạo đơn hàng</span><span class="src">api/orders/create.ts</span></div>
+                  <div class="tr l3"><span>☑</span><span class="nm">6.3 Job nền &amp; hàng đợi</span><span class="src">jobs/ · BullMQ</span></div>
+                  <div class="tr l2 new"><span class="grip">⠿</span><span>☑</span><span class="nm">8. <abbr class="tt" title="Chủ đề áp cho toàn hệ thống">Cross-cutting Concepts</abbr> — i18n</span><span class="src">agent đề xuất thêm</span></div>
+                  <div class="tr l2"><span class="grip">⠿</span><span>☑</span><span class="nm">9. <abbr class="tt" title="ADR — quyết định kiến trúc kèm lý do">Architecture Decisions</abbr></span><span class="src">7 quyết định phát hiện được</span></div>
+                  <div class="tr l2"><span class="grip">⠿</span><span>☑</span><span class="nm">10. <abbr class="tt" title="Kịch bản chất lượng theo ISO/IEC 25010">Quality Requirements</abbr></span><span class="src">ISO 25010</span></div>
+                  <div class="tr l2 drop"><span class="grip">⠿</span><span>☐</span><span class="nm">11. <abbr class="tt" title="Rủi ro đã biết và technical debt">Risks and Technical Debt</abbr></span><span class="src">chỉ 3 TODO → đề xuất bỏ</span></div>
+                  <div class="tr l2"><span class="grip">⠿</span><span>☑</span><span class="nm">12. <abbr class="tt" title="Thuật ngữ chuẩn dùng xuyên suốt bộ tài liệu">Glossary</abbr></span><span class="src">86 thuật ngữ</span></div>
+                </div>
+              </div>
+
+              <div style="display:flex;flex-direction:column;gap:11px">
+                <div class="as-card">
+                  <div class="as-label" style="margin-bottom:8px">Cách chạy <span class="as-dim">· đổi được giữa chừng</span></div>
+                  <div class="chk on" style="margin-bottom:6px"><i class="bx radio">●</i><span class="chk-t"><b>Song song theo tài liệu</b><span>Nhanh · tạm dừng, đổi account được</span></span></div>
+                  <div class="chk" style="margin-bottom:6px"><i class="bx radio"></i><span class="chk-t"><b>Tuần tự một phiên</b><span>Nhất quán thuật ngữ cao nhất · chậm hơn</span></span></div>
+                  <div class="chk"><i class="bx radio"></i><span class="chk-t"><b>Song song theo mục</b><span>Nhanh nhất · tốn token nhất</span></span></div>
+                </div>
+                <div class="as-card">
+                  <div class="as-label" style="margin-bottom:8px">Agent phát hiện</div>
+                  <div class="st d"><i class="ic">✓</i>Node 22 · TypeScript · Express</div>
+                  <div class="st d"><i class="ic">✓</i>PostgreSQL 24 bảng · Redis cho hàng đợi</div>
+                  <div class="st d"><i class="ic">✓</i>11 route handler → 11 luồng nghiệp vụ</div>
+                  <div class="st e"><i class="ic">!</i>Không có test project</div>
+                </div>
+                <div class="field">
+                  <span class="as-label">Yêu cầu agent sửa dàn ý</span>
+                  <textarea class="inp" rows="2" readonly>Gộp 6.1 vào mục 8. Tách job nền thành từng job một.</textarea>
+                </div>
+                <button class="as-ghost">↻ Đề xuất lại dàn ý <span class="tok lo">⛽ ~40K</span></button>
+                <button class="as-primary">✔ Duyệt &amp; bắt đầu viết <span class="tok">⛽ ~1.1M</span></button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="notes">
+      <div class="note chg"><h3>Đã sửa · preset</h3><p>Dàn ý duyệt xong lưu được thành <b>preset toàn cục</b>
+        (quản lý ở MH 8), áp cho project khác và <b>sửa lại tự do</b> sau khi áp.</p></div>
+      <div class="note chg"><h3>Đã sửa · cách chạy</h3><p>Chuyển từ wizard sang đây, cạnh nút Duyệt — và
+        đổi được trong lúc đang viết.</p></div>
+      <div class="note"><h3>Vì sao cần cổng này</h3><p>Không có dàn ý cố định thì % tiến độ vô nghĩa vì mẫu số
+        đổi giữa chừng. Duyệt xong, dàn ý đóng băng thành kế hoạch.</p></div>
+    </div>
+  </section>
+
+  <hr class="sep" />
+
+  <!-- ==================== MH4 ==================== -->
+  <section>
+    <div class="step-head"><span class="step-n">MH 4</span><h2>Theo dõi tiến độ — 2 kiểu xem</h2></div>
+    <p class="step-sub">Bỏ Kanban. Còn <b>Chi tiết</b> (đang ngồi theo dõi) và <b>Ma trận</b> (bộ tài liệu lớn,
+      chiếm hết chiều ngang). Bấm để đổi.</p>
+
+    <div class="as">
+      <div class="as-body solo">
+        <div style="display:flex;flex-direction:column">
+          <div class="as-top">
+            <b>Kiến trúc phần mềm · arc42 + C4</b>
+            <span class="pill run">▶ đang viết</span><span class="pill">62% · 8/12 mục</span>
+            <span class="pill acc">song song theo tài liệu ▾</span>
+            <div class="view-sw" role="tablist">
+              <button class="on" data-vw="a" role="tab" aria-selected="true">Chi tiết</button>
+              <button data-vw="c" role="tab" aria-selected="false">Ma trận</button>
+            </div>
+          </div>
+          <div class="as-main">
+
+            <div class="vw on" id="vwa">
+              <div class="p3">
+                <div>
+                  <div class="as-label" style="margin-bottom:8px">Kế hoạch</div>
+                  <div class="st d"><i class="ic">✓</i>1. <abbr class="tt" title="Bài toán, mục tiêu chất lượng, bên liên quan">Introduction and Goals</abbr></div>
+                  <div class="st d"><i class="ic">✓</i>2. <abbr class="tt" title="Ràng buộc kỹ thuật và tổ chức">Constraints</abbr></div>
+                  <div class="st d"><i class="ic">✓</i>3. <abbr class="tt" title="Hệ thống trao đổi gì với bên ngoài">Context and Scope</abbr></div>
+                  <div class="st d"><i class="ic">✓</i>4. <abbr class="tt" title="Quyết định nền tảng về công nghệ và phân rã">Solution Strategy</abbr></div>
+                  <div class="st d"><i class="ic">✓</i>5. <abbr class="tt" title="Phân rã hệ thống thành các khối">Building Block View</abbr></div>
+                  <div class="st w"><i class="ic">✍</i>6. <abbr class="tt" title="Kịch bản chạy thật của hệ thống">Runtime View</abbr> <span class="as-dim">2/3</span></div>
+                  <div class="st d sub"><i class="ic">✓</i>6.1 Xác thực</div>
+                  <div class="st w sub"><i class="ic">✍</i>6.2 Tạo đơn hàng</div>
+                  <div class="st p sub"><i class="ic">○</i>6.3 Job nền</div>
+                  <div class="st p"><i class="ic">○</i>8. <abbr class="tt" title="Chủ đề áp cho toàn hệ thống">Cross-cutting Concepts</abbr></div>
+                  <div class="st p"><i class="ic">○</i>9. ADR</div>
+                  <div class="st e"><i class="ic">▲</i>10. <abbr class="tt" title="Kịch bản chất lượng theo ISO/IEC 25010">Quality Requirements</abbr></div>
+                  <div class="st p"><i class="ic">○</i>12. <abbr class="tt" title="Thuật ngữ chuẩn của bộ tài liệu">Glossary</abbr></div>
+                </div>
+
+                <div>
+                  <div class="as-label" style="margin-bottom:8px">Đang viết · §6.2</div>
+                  <div class="write">
+                    <h4>6.2 Tạo đơn hàng</h4>
+                    <p>Endpoint <code>POST /api/orders</code> nhận <code>CreateOrderInput</code>,
+                      kiểm tra quyền qua <code>checkPolicy</code>, sinh mã hồ sơ theo cấu hình
+                      <code>orders.codePattern</code>, ghi bảng <code>orders</code> và
+                      <code>order_items</code>, phát sự kiện <code>order.created</code> cho job
+                      gửi thông báo<span class="caret"></span></p>
+                  </div>
+                  <div class="as-label" style="margin:12px 0 7px">Hoạt động</div>
+                  <div class="feed">
+                    <div>📖 đọc <span>src/api/orders/create.ts</span></div>
+                    <div>🔎 tìm <span>checkPolicy</span></div>
+                    <div>📖 đọc <span>src/services/orders/create.ts</span></div>
+                    <div>✍️ viết <span>ir/sad/6.2.json</span></div>
+                  </div>
+                </div>
+
+                <div>
+                  <div class="as-label" style="margin-bottom:8px">Thống kê</div>
+                  <div class="stat"><span class="as-muted">Tiến độ</span><b>62%</b></div>
+                  <div class="bar"><i style="width:62%;background:var(--running)"></i></div>
+                  <div class="stat"><span class="as-muted">Mục</span><b>8 / 12</b></div>
+                  <div class="stat"><span class="as-muted">Nội dung</span><b>~64 trang</b></div>
+                  <div class="stat as-dim" style="padding-top:0;font-size:10.5px"><span>28 bảng · 19 hình</span></div>
+                  <div class="stat"><span class="as-muted">Đã chạy</span><b>41′06″</b></div>
+                  <div class="stat"><span class="as-muted">Token</span><b>1.2M</b></div>
+                  <div class="as-label" style="margin:12px 0 7px">Chất lượng · 78/100</div>
+                  <div class="mini">
+                    <div class="mini-row"><span>Đầy đủ</span><span class="bar"><i style="width:82%;background:var(--done)"></i></span><b class="num">82</b></div>
+                    <div class="mini-row"><span><abbr class="tt" title="Yêu cầu ↔ thiết kế ↔ kiểm thử">Traceability</abbr></span><span class="bar"><i style="width:41%;background:var(--error)"></i></span><b class="num">41</b></div>
+                    <div class="mini-row"><span>Nhất quán</span><span class="bar"><i style="width:93%;background:var(--done)"></i></span><b class="num">93</b></div>
+                    <div class="mini-row"><span>Kiểm chứng</span><span class="bar"><i style="width:71%;background:var(--running)"></i></span><b class="num">71</b></div>
+                  </div>
+                  <div style="margin-top:11px"><span class="pill err">⚠ 7 lỗi thuật ngữ</span></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="vw" id="vwc">
+              <table class="hm">
+                <thead><tr><th class="rowh">Tài liệu</th>
+                  <th>§1</th><th>§2</th><th>§3</th><th>§4</th><th>§5</th><th>§6</th><th>§7</th><th>§8</th>
+                  <th>§9</th><th>§10</th><th>§11</th><th>§12</th><th class="pct">%</th></tr></thead>
+                <tbody>
+                  <tr><th class="rowh">Software Architecture</th>
+                    <td class="d">✓</td><td class="d">✓</td><td class="d">✓</td><td class="d">✓</td><td class="d">✓</td>
+                    <td class="w">✍</td><td class="d">✓</td><td></td><td></td><td class="e">▲</td><td class="x"></td><td></td>
+                    <td class="pctv" style="color:var(--running)">62</td></tr>
+                  <tr><th class="rowh">Software Design Description</th>
+                    <td class="d">✓</td><td class="d">✓</td><td class="d">✓</td><td class="d">✓</td><td class="d">✓</td>
+                    <td class="d">✓</td><td class="d">✓</td><td class="d">✓</td><td class="d">✓</td><td class="d">✓</td><td class="d">✓</td><td class="x"></td>
+                    <td class="pctv" style="color:var(--done)">100</td></tr>
+                  <tr><th class="rowh">Database Design</th>
+                    <td class="d">✓</td><td class="d">✓</td><td class="d">✓</td><td class="d">✓</td><td class="d">✓</td>
+                    <td class="x"></td><td class="x"></td><td class="x"></td><td class="x"></td><td class="x"></td><td class="x"></td><td class="x"></td>
+                    <td class="pctv" style="color:var(--done)">100</td></tr>
+                  <tr><th class="rowh">Deployment &amp; Installation</th>
+                    <td></td><td></td><td></td><td></td><td></td><td></td><td class="x"></td><td class="x"></td>
+                    <td class="x"></td><td class="x"></td><td class="x"></td><td class="x"></td>
+                    <td class="pctv" style="color:var(--muted)">0</td></tr>
+                  <tr><th class="rowh">Configuration Management</th>
+                    <td class="d">✓</td><td></td><td class="e">▲</td><td></td><td></td><td class="x"></td><td class="x"></td><td class="x"></td>
+                    <td class="x"></td><td class="x"></td><td class="x"></td><td class="x"></td>
+                    <td class="pctv" style="color:var(--error)">20</td></tr>
+                  <tr><th class="rowh">User Guide</th>
+                    <td class="d">✓</td><td class="w">✍</td><td></td><td></td><td></td><td></td><td></td><td></td><td class="x"></td><td class="x"></td><td class="x"></td><td class="x"></td>
+                    <td class="pctv" style="color:var(--running)">19</td></tr>
+                  <tr><th class="rowh">Administrator Guide</th>
+                    <td class="d">✓</td><td class="d">✓</td><td class="d">✓</td><td></td><td></td><td></td><td class="x"></td><td class="x"></td>
+                    <td class="x"></td><td class="x"></td><td class="x"></td><td class="x"></td>
+                    <td class="pctv" style="color:var(--running)">50</td></tr>
+                </tbody>
+              </table>
+              <div class="legend">
+                <span><i style="background:color-mix(in srgb,var(--done) 62%,var(--surface2))"></i>xong</span>
+                <span><i style="background:color-mix(in srgb,var(--running) 62%,var(--surface2))"></i>đang viết</span>
+                <span><i style="background:var(--surface2)"></i>chờ</span>
+                <span><i style="background:color-mix(in srgb,var(--error) 58%,var(--surface2))"></i>vướng</span>
+                <span><i style="background:transparent;border:1px solid var(--line)"></i>chuẩn không có mục này</span>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="notes">
+      <div class="note chg"><h3>Đã sửa · bỏ Kanban</h3><p>Trùng vai trò với Ma trận mà kém dày thông tin hơn.</p></div>
+      <div class="note chg"><h3>Đã sửa · Ma trận full width</h3><p>Bảng chiếm hết chiều ngang, cột cố định,
+        thêm cột % ở cuối mỗi hàng.</p></div>
+      <div class="note chg"><h3>Đã sửa · thống kê</h3><p>Bỏ <b>Quota 5h</b>. Gộp “bảng · hình” thành dòng phụ
+        dưới số trang. Giữ Token vì nó là chi phí thật.</p></div>
+    </div>
+  </section>
+
+  <hr class="sep" />
+
+  <!-- ==================== MH5 ==================== -->
+  <section>
+    <div class="step-head"><span class="step-n">MH 5</span><h2>Chấm điểm — trọng số tuỳ chỉnh</h2></div>
+    <p class="step-sub">Bảy tiêu chí, mỗi tiêu chí là một hàm chạy trên nội dung. <b>Chấm bằng luật thì miễn phí
+      token</b>; chỉ phần nhận xét định tính mới tốn. Mọi nút đều <b>hiện ước tính</b>, nhưng chỉ việc
+      <b>vượt 50K token</b> mới hỏi lại — dưới ngưỡng thì chạy thẳng.</p>
+
+    <div class="as">
+      <div class="as-body solo">
+        <div style="display:flex;flex-direction:column">
+          <div class="as-top">
+            <b>Kiến trúc phần mềm · arc42 + C4</b>
+            <div class="as-tabs"><button>Tiến độ</button><button class="on">Chấm điểm</button>
+              <button>Lỗi thuật ngữ</button><button>Xuất bản</button></div>
+            <button class="as-ghost">↻ Chấm lại <span class="tok free">miễn phí</span></button>
+            <button class="as-ghost">✎ Nhận xét chi tiết <span class="tok lo">⛽ ~35K</span></button>
+          </div>
+          <div class="as-main">
+            <div class="as-card score-h">
+              <div><div class="as-label">Tổng điểm</div><div class="big" style="color:var(--running)">78</div>
+                <div class="as-dim">/ 100 · mức <b>Khá</b></div></div>
+              <div style="flex:1;min-width:280px;display:flex;flex-direction:column;gap:7px">
+                <div class="crit" style="color:var(--muted);font-size:9.5px;letter-spacing:.11em;text-transform:uppercase">
+                  <span>Tiêu chí</span><span style="text-align:center">Trọng số</span><span>Điểm</span><span></span></div>
+                <div class="crit"><span>Đầy đủ · 15289, 26514</span><span class="wgt">25%</span><span class="bar"><i class="ok" style="width:82%"></i></span><b class="num">82</b></div>
+                <div class="crit"><span><abbr class="tt" title="Yêu cầu ↔ thiết kế ↔ kiểm thử có nối được với nhau không">Traceability</abbr> · 29148</span><span class="wgt">10%</span><span class="bar"><i class="bad" style="width:41%"></i></span><b class="num">41</b></div>
+                <div class="crit"><span>Nhất quán thuật ngữ</span><span class="wgt">15%</span><span class="bar"><i class="ok" style="width:93%"></i></span><b class="num">93</b></div>
+                <div class="crit"><span>Kiểm chứng được · 26513</span><span class="wgt">25%</span><span class="bar"><i class="warn" style="width:71%"></i></span><b class="num">71</b></div>
+                <div class="crit"><span>Trình bày &amp; điều hướng</span><span class="wgt">10%</span><span class="bar"><i class="ok" style="width:88%"></i></span><b class="num">88</b></div>
+                <div class="crit"><span><abbr class="tt" title="Alt text cho hình, thứ bậc heading, bảng có hàng tiêu đề">Accessibility</abbr> · WCAG, PDF/UA</span><span class="wgt">5%</span><span class="bar"><i class="warn" style="width:64%"></i></span><b class="num">64</b></div>
+                <div class="crit"><span>An toàn thông tin</span><span class="wgt">10%</span><span class="bar"><i class="ok" style="width:96%"></i></span><b class="num">96</b></div>
+                <div class="row" style="margin-top:5px">
+                  <span class="as-dim" style="font-size:10.5px">Tổng trọng số 100% · lưu thành hồ sơ chấm</span>
+                  <button class="mini-btn">Chỉnh trọng số</button>
+                  <button class="mini-btn">Hồ sơ: “Khách hàng nhà nước” ▾</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="as-card">
+              <div class="as-label" style="margin-bottom:9px">Khuyến nghị — sắp theo mức tăng điểm</div>
+              <div class="st e"><i class="ic">1</i>Gắn mã <code>FR-##</code> từ tài liệu agile vào từng luồng §6
+                <span class="pill acc">+14 điểm</span> <button class="mini-btn">Giao agent <span class="tok">⛽ ~90K</span></button></div>
+              <div class="st e"><i class="ic">2</i>Bổ sung 6 chỉ tiêu chất lượng còn trống ở §10
+                <span class="pill acc">+9</span> <button class="mini-btn">Mở danh sách <span class="tok free">miễn phí</span></button></div>
+              <div class="st w"><i class="ic">3</i>Thêm chú thích (alt text) cho 19 hình
+                <span class="pill acc">+6</span> <button class="mini-btn">Giao agent <span class="tok lo">⛽ ~25K</span></button></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <p class="step-sub" style="margin-top:22px">Ba mức nhãn: <span class="tag">miễn phí</span> chạy bằng luật ·
+      <span class="tag">⛽ ~35K</span> có tốn nhưng dưới ngưỡng, chạy thẳng ·
+      <span class="tag chg">⛽ ~90K</span> vượt <b>50K</b> nên hỏi trước, kèm ô “không hỏi lại”:</p>
+
+    <div class="as">
+      <div class="dlg-shell">
+        <div class="dlg">
+          <h4>Việc này sẽ tiêu token</h4>
+          <p style="margin:0;color:var(--muted);font-size:11.5px">Giao agent gắn mã yêu cầu vào 14 luồng của
+            §6 — ước tính <b style="color:var(--ink)">~90K token</b> (≈ 0,6% quota 5h của account đang dùng).</p>
+          <div class="as-card" style="padding:9px 11px">
+            <div class="stat"><span class="as-muted">Account</span><b>minh@… · còn 68%</b></div>
+            <div class="stat"><span class="as-muted">Đã tiêu cho bộ này</span><b>1.2M token</b></div>
+          </div>
+          <div class="chk on" style="align-items:center"><i class="bx">✓</i>
+            <span class="chk-t"><b>Không hỏi lại cho loại việc này</b>
+              <span>Ngưỡng hỏi hiện tại: 50K token · chỉnh ở Cài đặt → Chung</span></span></div>
+          <div class="row" style="justify-content:flex-end">
+            <button class="as-ghost">Huỷ</button><button class="as-primary">Chạy</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="notes">
+      <div class="note chg"><h3>Đã sửa · trọng số</h3><p>Mỗi tiêu chí có trọng số chỉnh được, gộp thành
+        <b>hồ sơ chấm</b> dùng lại (ví dụ “Khách hàng nhà nước” nâng Đầy đủ và An toàn).</p></div>
+      <div class="note chg"><h3>v3 · ngưỡng hỏi 50K</h3><p>Mọi nút <b>hiện ước tính</b> token, nhưng chỉ việc
+        <b>vượt 50K</b> mới mở hộp thoại. Ngưỡng chỉnh được ở Cài đặt → Chung; “không hỏi lại” nhớ theo
+        <i>loại việc</i>, không phải toàn cục.</p></div>
+      <div class="note"><h3>Chấm bằng luật</h3><p>Đếm mục bắt buộc, đếm câu có dẫn <code>file:line</code>,
+        đếm hình có alt text, đếm giá trị trống — không cần gọi model.</p></div>
+    </div>
+  </section>
+
+  <hr class="sep" />
+
+  <!-- ==================== MH6 ==================== -->
+  <section>
+    <div class="step-head"><span class="step-n">MH 6</span><h2>Bắt lỗi từ ngữ technical</h2></div>
+    <p class="step-sub">Bộ luật nội bộ chạy sẵn, miễn phí token. <b>Vale</b> là tiện ích tuỳ chọn — bật lên thì
+      có thêm luật của Google / Microsoft style guide.</p>
+
+    <div class="as">
+      <div class="as-body solo">
+        <div style="display:flex;flex-direction:column">
+          <div class="as-top">
+            <b>Kiến trúc phần mềm · arc42 + C4</b>
+            <div class="as-tabs"><button>Tiến độ</button><button>Chấm điểm</button>
+              <button class="on">Lỗi thuật ngữ</button><button>Xuất bản</button></div>
+            <span class="pill err">2 nặng</span><span class="pill run">3 vừa</span><span class="pill">2 nhẹ</span>
+            <span class="pill acc">Vale · Google style ✓</span>
+          </div>
+          <div class="as-main" style="gap:9px">
+            <div class="find hi">
+              <span class="pill err">Sai sự thật</span>
+              <div><b>Tên không tồn tại trong mã nguồn</b> — <code>IOrderValidator</code>
+                <div class="why">§6.2 — không tìm thấy trong repo. Gần nhất: <code>validateCreateOrder</code></div></div>
+              <div style="display:flex;gap:5px"><button class="mini-btn">Sửa</button><button class="mini-btn">Xem code</button></div>
+            </div>
+            <div class="find hi">
+              <span class="pill err">Bảo mật</span>
+              <div><b>Chuỗi kết nối còn nguyên mật khẩu</b> — <code>…User ID=sa;Password=P@ssw0rd…</code>
+                <div class="why">§7 — đề xuất <code>User ID=&lt;user&gt;;Password=&lt;password&gt;</code></div></div>
+              <div style="display:flex;gap:5px"><button class="mini-btn">Che</button><button class="mini-btn">Giữ</button></div>
+            </div>
+            <div class="find md">
+              <span class="pill run">Nhất quán</span>
+              <div><b>Một khái niệm, ba cách gọi</b> — <code>endpoint</code> · <code>điểm cuối</code> · <code>API route</code>
+                <div class="why">§6.1, §6.2, §8 — từ điển chọn <code>endpoint</code> (11 lần), 2 chỗ lệch</div></div>
+              <div style="display:flex;gap:5px"><button class="mini-btn">Thống nhất</button><button class="mini-btn">Xem</button></div>
+            </div>
+            <div class="find md">
+              <span class="pill run">Dịch sai</span>
+              <div><b>Thuật ngữ không nên dịch</b> — “gieo mầm dữ liệu” → <code>chạy seed</code>
+                <div class="why">§7 — sai nghĩa kỹ thuật</div></div>
+              <div style="display:flex;gap:5px"><button class="mini-btn">Sửa</button><button class="mini-btn">Bỏ qua</button></div>
+            </div>
+            <div class="find md">
+              <span class="pill run">Vale · Google</span>
+              <div><b>Câu bị động, nên viết chủ động</b> — “Hồ sơ sẽ được xử lý bởi hệ thống”
+                <div class="why">§6.2 · luật <code>Google.Passive</code> — đề xuất “Hệ thống xử lý hồ sơ”</div></div>
+              <div style="display:flex;gap:5px"><button class="mini-btn">Sửa</button><button class="mini-btn">Tắt luật</button></div>
+            </div>
+            <div class="find lo">
+              <span class="pill">Chính tả</span>
+              <div><b>Viết hoa không đúng tên riêng</b> — <code>postgresql</code> → <code>PostgreSQL</code>
+                <div class="why">§6.1 · 3 chỗ</div></div>
+              <div style="display:flex;gap:5px"><button class="mini-btn">Sửa hết</button><button class="mini-btn">Bỏ qua</button></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="notes">
+      <div class="note chg"><h3>Đã làm rõ · Vale</h3><p>Là <b>tiện ích tuỳ chọn</b>, cùng cơ chế với
+        doc-protect-tool: Studio tự dò trên máy, hỏi cài nếu chưa có, chọn style pack (Google / Microsoft).
+        Không có Vale thì 5 nhóm luật nội bộ vẫn chạy đủ.</p></div>
+      <div class="note"><h3>Phát hiện của Vale ghi rõ nguồn</h3><p>Nhãn <code>Vale · Google</code> và tên luật
+        <code>Google.Passive</code>, tắt được từng luật — không lẫn với luật nội bộ.</p></div>
+      <div class="note"><h3>Hai nhóm chặn xuất bản</h3><p><b>Sai sự thật</b> và <b>Bảo mật</b> phải xử lý hoặc
+        miễn trừ có ghi lý do thì mới xuất được file.</p></div>
+    </div>
+  </section>
+
+  <hr class="sep" />
+
+  <!-- ==================== MH7 ==================== -->
+  <section>
+    <div class="step-head"><span class="step-n">MH 7</span><h2>Xuất bản — làm lúc nào cũng được</h2></div>
+    <p class="step-sub">Nội dung nằm trong Agile Studio. Xuất là một <b>hành động</b>, chọn file + định dạng +
+      nơi lưu ngay lúc đó. Xuất được cả khi đang viết dở (bản nháp).</p>
+
+    <div class="as">
+      <div class="as-body solo">
+        <div style="display:flex;flex-direction:column">
+          <div class="as-top">
+            <b>Kiến trúc phần mềm · arc42 + C4</b>
+            <div class="as-tabs"><button>Tiến độ</button><button>Chấm điểm</button>
+              <button>Lỗi thuật ngữ</button><button class="on">Xuất bản</button></div>
+            <button class="as-primary">⬇ Xuất…</button>
+          </div>
+          <div class="as-main" style="gap:9px">
+            <div class="as-card" style="padding:10px 12px">
+              <div class="row" style="gap:9px;align-items:center">
+                <span class="pill err">⚠ 2 lỗi nặng chưa xử lý</span>
+                <span class="as-muted" style="font-size:11px">Xuất được bản nháp có đóng dấu “BẢN NHÁP”;
+                  muốn xuất bản chính thức thì xử lý ở tab Lỗi thuật ngữ trước.</span>
+              </div>
+            </div>
+            <div class="as-label">Nội dung trong Studio</div>
+            <div class="art"><span>📘</span>
+              <div class="nm">Acme Portal — Software Architecture<em>12 mục · ~64 trang · cập nhật 14:22 · điểm 78</em></div>
+              <span class="pill run">đang viết 8/12</span><button class="mini-btn">Xem</button></div>
+            <div class="as-label" style="margin-top:6px">Đã xuất ra máy</div>
+            <div class="art"><span>📄</span>
+              <div class="nm">Acme Portal — Software Architecture v0.9.docx<em>E:\tai-lieu\Acme Portal · 1,8 MB · 26/07 09:14</em></div>
+              <span class="pill">Word</span><button class="mini-btn">📂</button></div>
+            <div class="art"><span>📕</span>
+              <div class="nm">Acme Portal — Software Architecture v0.9.pdf<em>E:\tai-lieu\Acme Portal · 24,6 MB · 26/07 09:16</em></div>
+              <span class="pill ok">🔒 chống sao chép</span><button class="mini-btn">📂</button></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <p class="step-sub" style="margin-top:22px">Nút <b>⬇ Xuất…</b> mở hộp thoại — đây là nơi duy nhất chọn định
+      dạng và nơi lưu:</p>
+
+    <div class="as">
+      <div class="dlg-shell">
+        <div class="dlg" style="width:min(480px,100%)">
+          <h4>Xuất bộ tài liệu</h4>
+          <div class="field"><span class="as-label">Tài liệu</span>
+            <div class="chk on" style="align-items:center"><i class="bx">✓</i>
+              <span class="chk-t"><b>Acme Portal — Software Architecture</b><span>12 mục · đang viết 8/12</span></span></div>
+          </div>
+          <div class="field"><span class="as-label">Định dạng</span>
+            <div style="display:flex;flex-direction:column;gap:6px">
+              <div class="chk on" style="align-items:center"><i class="bx">✓</i><span class="chk-t"><b>Word (.docx)</b><span>Bản gốc để sửa</span></span></div>
+              <div class="chk on" style="align-items:center"><i class="bx">✓</i><span class="chk-t"><b>PDF thường</b><span>Có text · copy và tìm kiếm được</span></span></div>
+              <div class="chk" style="align-items:center"><i class="bx"></i><span class="chk-t"><b>PDF chống sao chép</b>
+                <span><abbr class="tt" title="Mỗi trang thành một ảnh, không còn lớp text">Raster</abbr> + watermark + mã hoá · cần extension doc-protect-tool</span></span></div>
+            </div>
+          </div>
+          <div class="field"><span class="as-label">Lưu vào</span>
+            <div class="row" style="gap:7px"><input class="inp" style="flex:1" value="E:\tai-lieu\Acme Portal" readonly />
+              <button class="as-ghost">Chọn…</button></div>
+          </div>
+          <div class="row" style="justify-content:space-between;align-items:center">
+            <span class="tok free">miễn phí · không tiêu token</span>
+            <div class="row" style="gap:7px"><button class="as-ghost">Huỷ</button>
+              <button class="as-primary">Xuất 2 tệp</button></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="notes">
+      <div class="note chg"><h3>Đã sửa · không chọn trước</h3><p>Bỏ bước 4 khỏi wizard. Không hỏi thư mục lúc
+        tạo job; nội dung nằm trong storage của Studio.</p></div>
+      <div class="note chg"><h3>Đã sửa · xuất lúc nào cũng được</h3><p>Kể cả đang viết dở — bản nháp có đóng
+        dấu, và lỗi nặng chỉ chặn bản chính thức chứ không chặn bản nháp.</p></div>
+      <div class="note"><h3>Xuất là miễn phí</h3><p>Toàn bộ bước xuất chạy bằng code, không gọi model.</p></div>
+    </div>
+  </section>
+
+  <hr class="sep" />
+
+  <!-- ==================== MH8 ==================== -->
+  <section>
+    <div class="step-head"><span class="step-n">MH 8</span><h2>Modal Cài đặt — bố cục kiểu claude.ai</h2></div>
+    <p class="step-sub">Mở từ nút <code>⚙ Cài đặt</code> (sidebar) hoặc bánh răng ở topbar. Không làm trang riêng —
+      là <b>modal</b> có ô tìm kiếm, danh mục trái chia nhóm, nội dung phải, nút ✕ góc trên. Modal Cài đặt hiện
+      tại được mở rộng thành bố cục này, mục cũ giữ nguyên.</p>
+
+    <div class="as">
+      <div class="set-shell">
+      <div class="set">
+        <nav class="set-nav">
+          <div class="set-search">🔍 Tìm cài đặt…</div>
+          <div class="as-label">Cài đặt</div>
+          <button><i>⚙</i>Chung</button>
+          <button><i>👤</i>Account</button>
+          <button><i>🔌</i>Kết nối</button>
+          <button><i>🤖</i>Model &amp; chi phí</button>
+          <div class="as-label">Tài liệu</div>
+          <button class="on"><i>🧰</i>Tiện ích</button>
+          <button><i>📘</i>Mẫu tài liệu</button>
+          <button><i>🧾</i>Preset dàn ý</button>
+          <button><i>📊</i>Hồ sơ chấm điểm</button>
+          <div class="as-label">Tuỳ chỉnh</div>
+          <button><i>🧠</i>Skill</button>
+        </nav>
+        <div class="set-body">
+          <button class="set-x">✕</button>
+          <div class="set-h">Tiện ích</div>
+          <div class="as-card">
+            <div class="row" style="align-items:center;margin-bottom:10px">
+              <span class="as-muted" style="font-size:11px">Extension — công cụ ngoài mà tính năng tài liệu gọi tới</span>
+              <button class="as-ghost" style="margin-left:auto">🔍 Rà lại máy</button>
+            </div>
+            <div class="as-scroll">
+              <table class="as-tbl">
+                <thead><tr><th>Tiện ích</th><th>Trạng thái</th><th>Dùng để</th><th></th></tr></thead>
+                <tbody>
+                  <tr>
+                    <td><b>Python</b><br /><span class="as-dim">3.12.4 · C:\Python312</span></td>
+                    <td><span class="pill ok">✓ tự tìm thấy</span></td>
+                    <td>Dựng file Word</td>
+                    <td class="as-dim">bắt buộc</td>
+                  </tr>
+                  <tr>
+                    <td><b>python-docx</b><br /><span class="as-dim">1.1.2</span></td>
+                    <td><span class="pill ok">✓ đã cài</span></td><td>Ghi .docx theo mẫu</td><td class="as-dim">bắt buộc</td>
+                  </tr>
+                  <tr>
+                    <td><b>Microsoft Word</b><br /><span class="as-dim">Office 365</span></td>
+                    <td><span class="pill ok">✓ tự tìm thấy</span></td><td>Cập nhật mục lục khi xuất PDF</td>
+                    <td class="as-dim">ưu tiên</td>
+                  </tr>
+                  <tr>
+                    <td><b>LibreOffice</b><br /><span class="as-dim">24.8</span></td>
+                    <td><span class="pill ok">✓ tự tìm thấy</span></td><td>Xuất PDF khi không có Word</td>
+                    <td class="as-dim">dự phòng</td>
+                  </tr>
+                  <tr>
+                    <td><b>doc-protect-tool</b><br /><span class="as-dim">chưa có trên máy</span></td>
+                    <td><span class="pill err">✕ chưa cài</span></td><td>PDF chống sao chép</td>
+                    <td><button class="mini-btn">Cài giúp tôi</button></td>
+                  </tr>
+                  <tr>
+                    <td><b>Vale</b><br /><span class="as-dim">chưa có trên máy</span></td>
+                    <td><span class="pill err">✕ chưa cài</span></td><td>Luật văn phong Google / Microsoft</td>
+                    <td><button class="mini-btn">Cài giúp tôi</button></td>
+                  </tr>
+                  <tr>
+                    <td><b>Graphviz</b><br /><span class="as-dim">chưa có trên máy</span></td>
+                    <td><span class="pill run">△ tuỳ chọn</span></td><td>Vẽ sơ đồ luồng đẹp hơn</td>
+                    <td><button class="mini-btn">Cài giúp tôi</button></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p class="sample" style="margin-top:10px">Studio <b>tự rà</b> máy: PATH, thư mục cài quen thuộc,
+              registry, môi trường Python. Không tìm thấy thì đề xuất cách cài và <b>chạy giúp sau khi bạn
+              xác nhận</b> — chỉ khi tự động thất bại mới hỏi đường dẫn thủ công.</p>
+          </div>
+
+          <div class="as-card">
+            <div class="as-label" style="margin-bottom:9px">Ví dụ — bấm “Cài giúp tôi” cho doc-protect-tool</div>
+            <div class="st p"><i class="ic">1</i>Tải <code>github.com/doducminh/doc-protect-tool</code> về thư mục tiện ích của Studio</div>
+            <div class="st p"><i class="ic">2</i>Chạy <code>pip install -r requirements.txt</code> (PyMuPDF, pikepdf)</div>
+            <div class="st p"><i class="ic">3</i>Tạo <code>.env</code> từ <code>.env.example</code> và kiểm tra thử một trang</div>
+            <div class="row" style="margin-top:9px"><button class="as-ghost">Nhập đường dẫn thủ công</button>
+              <button class="as-primary">Đồng ý, cài giúp tôi</button></div>
+          </div>
+
+          <div class="as-card">
+            <div class="as-label" style="margin-bottom:9px">Mẫu tài liệu — cấp studio, project đè lại được</div>
+            <div class="st d"><i class="ic">📘</i>Mẫu tài liệu kỹ thuật v3.docx <span class="pill acc">mặc định toàn cục</span></div>
+            <div class="st d"><i class="ic">📘</i>Mẫu tài liệu nghiệp vụ.docx</div>
+            <div class="st p"><i class="ic">＋</i>Thêm mẫu…</div>
+            <p class="sample" style="margin-top:8px">Mỗi project có mục <i>Mẫu tài liệu</i> riêng: để trống thì
+              kế thừa mẫu toàn cục, đặt giá trị thì đè cho mọi bộ tài liệu của project đó.</p>
+          </div>
+        </div>
+      </div>
+      </div>
+    </div>
+
+    <div class="notes">
+      <div class="note chg"><h3>v3 · modal, không phải trang</h3><p>Mở rộng modal Cài đặt sẵn có thành bố cục
+        claude.ai: ô tìm kiếm, danh mục chia nhóm, ✕ góc trên. Mục cũ (Chung, Account) giữ nguyên vị trí.</p></div>
+      <div class="note chg"><h3>Đã sửa · không bắt nhập đường dẫn</h3><p>Studio tự rà, đề xuất cài, và cài giúp
+        sau khi xác nhận. Nhập tay chỉ là lối thoát cuối.</p></div>
+      <div class="note chg"><h3>Đã sửa · mẫu 3 cấp</h3><p>Mẫu toàn cục ↔ mẫu riêng của project ↔ đè riêng cho
+        một bộ tài liệu (MH 2 bước 3).</p></div>
+    </div>
+  </section>
+
+  <hr class="sep" />
+
+  <section>
+    <div class="step-head"><span class="step-n">LỘ TRÌNH</span><h2>Tách thành 8 feature, làm theo thứ tự</h2></div>
+    <p class="step-sub">Mỗi feature <b>chạy được và duyệt được độc lập</b>. Làm xong một feature → bạn duyệt kết quả →
+      mới tạo issue và PR cho feature đó → sang feature kế tiếp.</p>
+
+    <div class="as">
+      <div class="as-body solo">
+        <div class="as-main">
+          <div class="as-scroll">
+            <table class="as-tbl">
+              <thead><tr><th>#</th><th>Feature</th><th>Duyệt được ở chỗ nào</th><th>Ưu tiên</th><th>Cỡ</th><th>Cần trước</th></tr></thead>
+              <tbody>
+                <tr><td><b>D1</b></td><td><b>Tạo bộ tài liệu &amp; chốt dàn ý</b><br />
+                  <span class="as-dim">tab 📚 Tài liệu · wizard 3 bước · khảo sát · cổng duyệt · preset · quy ước token 50K</span></td>
+                  <td>Tạo được bộ tài liệu, agent đề xuất dàn ý theo chuẩn, sửa và duyệt được</td>
+                  <td><span class="pill err">P1</span></td><td>M</td><td>—</td></tr>
+                <tr><td><b>D2</b></td><td><b>Viết nội dung &amp; theo dõi tiến độ</b><br />
+                  <span class="as-dim">IR · 3 cách chạy · 2 kiểu xem · sự kiện realtime</span></td>
+                  <td>Đọc được nội dung tài liệu ngay trong app, thấy tiến độ từng mục</td>
+                  <td><span class="pill err">P1</span></td><td>L</td><td>D1</td></tr>
+                <tr><td><b>D3</b></td><td><b>Cài đặt &amp; tiện ích</b><br />
+                  <span class="as-dim">modal kiểu claude.ai · tự dò/cài công cụ · mẫu Word 3 cấp</span></td>
+                  <td>Máy trắng vẫn cài đủ công cụ mà không phải gõ đường dẫn</td>
+                  <td><span class="pill err">P1</span></td><td>M</td><td>—</td></tr>
+                <tr><td><b>D4</b></td><td><b>Xuất Word theo mẫu</b><br />
+                  <span class="as-dim">sidecar Python · dò style + bảng kiểm soát · render .docx</span></td>
+                  <td>Mở file .docx bằng Word, đúng font/màu/bảng của mẫu công ty</td>
+                  <td><span class="pill err">P1</span></td><td>L</td><td>D2, D3</td></tr>
+                <tr><td><b>D5</b></td><td><b>Xuất PDF &amp; bản chống sao chép</b><br />
+                  <span class="as-dim">Word COM → LibreOffice · doc-protect-tool · hộp thoại xuất</span></td>
+                  <td>Có PDF thường và PDF bảo vệ, link vẫn bấm được</td>
+                  <td><span class="pill run">P2</span></td><td>M</td><td>D4</td></tr>
+                <tr><td><b>D6</b></td><td><b>Chấm điểm theo chuẩn</b><br />
+                  <span class="as-dim">7 tiêu chí · trọng số · hồ sơ chấm · khuyến nghị</span></td>
+                  <td>Có điểm kèm bằng chứng, đổi trọng số thì điểm đổi đúng</td>
+                  <td><span class="pill run">P2</span></td><td>M</td><td>D2</td></tr>
+                <tr><td><b>D7</b></td><td><b>Bắt lỗi từ ngữ technical</b><br />
+                  <span class="as-dim">6 nhóm luật · từ điển thuật ngữ · Vale tuỳ chọn</span></td>
+                  <td>Bắt được tên class không tồn tại, secret, thuật ngữ lệch</td>
+                  <td><span class="pill run">P2</span></td><td>M</td><td>D2, D3</td></tr>
+                <tr><td><b>D8</b></td><td><b>Hướng dẫn sử dụng</b><br />
+                  <span class="as-dim">bổ sung mục vào README gốc + trang hướng dẫn riêng + ảnh chụp</span></td>
+                  <td>Người lạ đọc README là dùng được tính năng</td>
+                  <td><span class="pill">P3</span></td><td>S</td><td>D1–D7</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="sample">Mỗi feature D1–D7 tự cập nhật phần tài liệu của mình khi làm xong; <b>D8</b> là bước
+            gom lại, viết hướng dẫn hoàn chỉnh cho người dùng cuối theo đúng giọng của README gốc.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<script>
+  document.querySelectorAll("[data-wz]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      document.querySelectorAll("[data-wz]").forEach(function (x) {
+        x.classList.remove("on"); x.setAttribute("aria-selected", "false");
+      });
+      b.classList.add("on"); b.setAttribute("aria-selected", "true");
+      document.querySelectorAll(".wz-pane").forEach(function (p) { p.classList.remove("on"); });
+      document.getElementById("wz" + b.dataset.wz).classList.add("on");
+    });
+  });
+  document.querySelectorAll("[data-vw]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      document.querySelectorAll("[data-vw]").forEach(function (x) {
+        x.classList.remove("on"); x.setAttribute("aria-selected", "false");
+      });
+      b.classList.add("on"); b.setAttribute("aria-selected", "true");
+      document.querySelectorAll(".vw").forEach(function (p) { p.classList.remove("on"); });
+      document.getElementById("vw" + b.dataset.vw).classList.add("on");
+    });
+  });
+</script>
+
+<style>
+  @media (max-width:820px) { .ol-grid { grid-template-columns:1fr !important; } }
+</style>
