@@ -1251,10 +1251,20 @@ không làm dở dang. Mục này giữ lại nguyên kết quả điều tra đ
 
 | | Giá trị |
 |---|---|
-| `personal/local-work` | `5ac3ecc` *merge: docgen D1* — **khớp `origin`, 0/0**. Hơn `upstream/main` **36 commit** |
+| `personal/local-work` | `010e276` *docs: đưa spec + bàn giao docgen vào nhánh cá nhân* — **đã push, khớp `origin`**. Hơn `upstream/main` **37 commit** |
 | `feat/docgen-d2` | `fc23ef8` — đã push, 0 commit chưa đẩy |
 | Cần merge vào | **đúng 8 commit**: `d52c46a` → `fc23ef8` (D1 đã có sẵn qua merge `5ac3ecc`) |
 | Kiểu merge | Theo đúng nếp có sẵn trên nhánh đó: **merge commit**, tên dạng `merge: docgen D2 — …` |
+
+> **Chính tài liệu này giờ nằm trong git, trên `personal/local-work`** (`docs/issues/19-docgen/`,
+> commit `010e276`) — cùng chỗ với issue 01–18 vốn đã tracked ở đó. Nó **không** có trên
+> `feat/docgen-d2`, cố ý: `upstream/main` không có `docs/issues/`, commit vào nhánh docgen là nó đi
+> thẳng vào PR gửi tác giả (§10.4 #3).
+>
+> ⚠ **Hệ quả thực tế:** đứng ở `personal/local-work` thì thấy tài liệu này trên đĩa; `git checkout
+> feat/docgen-d2` là git **xoá** nó khỏi thư mục làm việc (vì nhánh đó không track). Không mất dữ
+> liệu — vẫn còn trong git — nhưng đừng hoảng. Phiên D3 để lại cây làm việc **đang ở
+> `personal/local-work`** đúng vì lý do này, và vì §11.4 bước 1 cũng bắt đầu từ đó.
 
 ## 11.2 ⚠ `personal/local-work` KHÔNG giống nhánh docgen — ba khác biệt đắt
 
